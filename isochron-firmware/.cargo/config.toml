@@ -1,0 +1,27 @@
+[target.'cfg(all(target_arch = "arm", target_os = "none"))']
+# Use probe-rs for flashing and RTT output
+# Install with: cargo install probe-rs-tools
+runner = "probe-rs run --chip RP2040 --protocol swd"
+
+[target.thumbv6m-none-eabi]
+rustflags = [
+    "-C", "link-arg=-Tlink.x",
+    "-C", "link-arg=-Tdefmt.x",
+]
+
+[build]
+target = "thumbv6m-none-eabi"
+
+[env]
+# Log levels: trace, debug, info, warn, error
+# Use trace for detailed step-by-step debugging
+DEFMT_LOG = "debug"
+
+[alias]
+# Convenient aliases for probe-rs workflow
+# Usage: cargo rrb (run release build via debug probe)
+rrb = "run --release --bin isochron-firmware"
+rb = "run --bin isochron-firmware"
+
+# For UF2 workflow, use: make
+# See Makefile for all build targets

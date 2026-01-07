@@ -1,0 +1,56 @@
+# probe-rs configuration for isochron-firmware
+# See: https://probe.rs/docs/tools/cargo-embed/
+
+[default.general]
+chip = "RP2040"
+log_level = "WARN"
+
+[default.rtt]
+enabled = true
+# Up channel 0 is used by defmt
+up_mode = "BlockIfFull"
+# Show defmt output
+channels = [
+    { up = 0, down = 0, name = "defmt", up_mode = "BlockIfFull" }
+]
+# Timeout in ms for establishing RTT connection
+timeout = 3000
+# Show timestamps in log output
+show_timestamps = true
+# Log to file (optional)
+# log_file = "./rtt.log"
+
+[default.flashing]
+enabled = true
+# Verify flash after programming
+verify = true
+# Full chip erase before programming
+do_chip_erase = false
+# Restore unwritten bytes to original values (faster for partial writes)
+restore_unwritten = true
+
+[default.reset]
+enabled = true
+# Halt after reset (useful for debugging startup)
+halt_afterwards = false
+
+[default.gdb]
+enabled = false
+# GDB server port (if enabled)
+# gdb_connection_string = "127.0.0.1:1337"
+
+# Profile for development (faster iteration)
+[dev]
+inherits = "default"
+
+[dev.flashing]
+# Skip verify for faster iteration during development
+verify = false
+
+# Profile for release testing
+[release]
+inherits = "default"
+
+[release.rtt]
+# More conservative RTT settings for release
+up_mode = "NoBlockSkip"

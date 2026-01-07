@@ -1,0 +1,43 @@
+[package]
+name = "isochron-hal-rp2040"
+version = "0.1.0"
+edition = "2021"
+description = "RP2040-specific HAL for Isochron watch cleaner firmware"
+license = "MIT OR Apache-2.0"
+
+[features]
+default = []
+defmt = ["dep:defmt", "embassy-rp/defmt"]
+
+[dependencies]
+isochron-core = { path = "../isochron-core", features = ["defmt"] }
+isochron-protocol = { path = "../isochron-protocol" }
+
+# Embassy
+embassy-executor = { workspace = true }
+embassy-time = { workspace = true }
+embassy-sync = { workspace = true }
+embassy-rp = { workspace = true }
+embassy-futures = { workspace = true }
+
+# Embedded
+cortex-m = { workspace = true }
+embedded-hal = { workspace = true }
+embedded-hal-async = { workspace = true }
+embedded-io = { workspace = true }
+embedded-io-async = { workspace = true }
+
+# Utilities
+heapless = { workspace = true }
+defmt = { workspace = true, optional = true }
+
+# Storage
+sequential-storage = { workspace = true }
+embedded-storage-async = { version = "0.4" }
+
+# Fixed-point math for PIO clock dividers
+fixed = "1.29"
+
+# PIO assembly (must match embassy-rp's pio-core version)
+pio-proc = "0.3"
+pio = "0.3"

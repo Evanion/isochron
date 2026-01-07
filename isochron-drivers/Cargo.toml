@@ -1,0 +1,19 @@
+[package]
+name = "isochron-drivers"
+version = "0.1.0"
+edition = "2021"
+description = "Hardware driver implementations for Isochron watch cleaner"
+license = "MIT OR Apache-2.0"
+
+[features]
+default = []
+defmt = ["dep:defmt", "isochron-core/defmt"]
+
+[dependencies]
+isochron-core = { path = "../isochron-core" }
+heapless = { workspace = true }
+defmt = { workspace = true, optional = true }
+embedded-hal = { workspace = true }
+embedded-hal-async = { workspace = true }
+
+[dev-dependencies]

@@ -1,0 +1,19 @@
+[package]
+name = "isochron-protocol"
+version = "0.1.0"
+edition = "2021"
+description = "V0 Display communication protocol for Isochron watch cleaner"
+license = "MIT OR Apache-2.0"
+
+# This crate is no_std compatible but can also be tested on host
+[features]
+default = []
+std = []  # Enable for host testing
+defmt = ["dep:defmt"]
+
+[dependencies]
+heapless = { workspace = true }
+defmt = { workspace = true, optional = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

@@ -1,0 +1,21 @@
+[package]
+name = "isochron-core"
+version = "0.1.0"
+edition = "2021"
+description = "Board-agnostic core logic for Isochron watch cleaner firmware"
+license = "MIT OR Apache-2.0"
+
+[features]
+default = []
+defmt = ["dep:defmt"]
+serde = ["dep:serde", "heapless/serde"]
+
+[dependencies]
+heapless = { workspace = true }
+defmt = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+postcard = { workspace = true }
+isochron-protocol = { path = "../isochron-protocol" }
+
+[dev-dependencies]
+proptest = { workspace = true }

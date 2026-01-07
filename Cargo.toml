@@ -1,0 +1,65 @@
+# Isochron - Watch Cleaning Machine Firmware
+# Klipper-inspired architecture for RP2040-based controllers
+#
+# Named after the Greek "isochronous" (ἰσόχρονος) meaning "equal time" -
+# reflecting both the precision timing of watch movements and the
+# consistent cleaning cycles this firmware provides.
+
+[workspace]
+resolver = "2"
+members = [
+    "isochron-core",
+    "isochron-drivers",
+    "isochron-hal-rp2040",
+    "isochron-protocol",
+    "isochron-firmware",
+]
+
+# Shared dependencies with consistent versions across workspace
+[workspace.dependencies]
+# Async runtime (use git for latest embassy)
+embassy-executor = { version = "0.9", features = ["arch-cortex-m", "executor-thread", "defmt"] }
+embassy-time = { version = "0.4", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-sync = { version = "0.7", features = ["defmt"] }
+embassy-rp = { version = "0.4", features = ["defmt", "time-driver", "critical-section-impl", "rp2040", "unstable-pac"] }
+embassy-futures = "0.1"
+
+# Embedded fundamentals
+cortex-m = { version = "0.7" }
+cortex-m-rt = "0.7"
+embedded-hal = "1.0"
+embedded-hal-async = "1.0"
+embedded-io = "0.6"
+embedded-io-async = "0.6"
+
+# Memory and storage
+heapless = { version = "0.8", features = ["defmt-03"] }
+embedded-alloc = "0.6"
+sequential-storage = "4.0"
+
+# Serialization
+postcard = { version = "1.0", features = ["alloc"] }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+
+# Configuration parsing (no_std + alloc)
+toml = { version = "0.9", default-features = false, features = ["parse"] }
+
+# Debugging
+defmt = "0.3"
+defmt-rtt = "0.4"
+panic-probe = { version = "0.3", features = ["print-defmt"] }
+
+# Testing (host only)
+[workspace.dependencies.proptest]
+version = "1.0"
+
+[profile.dev]
+debug = 2
+opt-level = 1  # Some optimization for embedded debug builds
+panic = "abort"
+
+[profile.release]
+debug = 2       # Keep debug info for defmt
+lto = "fat"     # Link-time optimization
+opt-level = "s" # Optimize for size
+panic = "abort"
