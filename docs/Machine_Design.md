@@ -35,11 +35,11 @@ The basket rotates to agitate watch parts in solution. Key considerations:
 ### Shaft and Bearings
 
 ```
-        ┌─────────────┐
-        │   Basket    │
-        └──────┬──────┘
+        ───────┬───────  ← Frame/top plate
                │
-        ═══════╪═══════  ← Thrust bearing (handles basket weight)
+        ═══════╪═══════  ← Thrust bearing (handles hanging basket weight)
+               │
+        ═══════╪═══════  ← Radial bearing
                │
         ┌──────┴──────┐
         │ Driven      │  ← GT2 pulley
@@ -49,9 +49,9 @@ The basket rotates to agitate watch parts in solution. Key considerations:
         ═══════╪═══════  ← Radial bearing
                │
                │
-        ═══════╪═══════  ← Radial bearing
-               │
-        ───────┴───────  ← Frame mount
+        ┌──────┴──────┐
+        │   Basket    │  ← Hangs down into jar
+        └─────────────┘
 ```
 
 - Use sealed bearings rated for the environment
