@@ -37,22 +37,27 @@ The basket rotates to agitate watch parts in solution. Key considerations:
 ```
         ───────┬───────  ← Frame/top plate
                │
-        ═══════╪═══════  ← Thrust bearing (handles hanging basket weight)
-               │
-        ═══════╪═══════  ← Radial bearing
+        ═══════╪═══════  ← Radial bearing (top)
                │
         ┌──────┴──────┐
         │ Driven      │  ← GT2 pulley
         │ Pulley      │
         └──────┬──────┘
                │
-        ═══════╪═══════  ← Radial bearing
+        ▄▄▄▄▄▄▄█▄▄▄▄▄▄▄  ← Shaft collar (fixed to shaft)
+        ═══════╪═══════  ← Thrust bearing (supports basket weight)
+        ───────┼───────  ← Bearing housing/plate
+               │
+        ═══════╪═══════  ← Radial bearing (bottom)
                │
                │
         ┌──────┴──────┐
         │   Basket    │  ← Hangs down into jar
         └─────────────┘
 ```
+
+The shaft collar sits on the thrust bearing, transferring the hanging basket weight
+to the bearing housing. This keeps axial load off the pulley and belt.
 
 - Use sealed bearings rated for the environment
 - Stainless steel shafts resist solvent exposure
