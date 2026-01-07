@@ -3,7 +3,7 @@ name = "isochron-core"
 version = "0.1.0"
 edition = "2021"
 description = "Board-agnostic core logic for Isochron watch cleaner firmware"
-license = "MIT OR Apache-2.0"
+license = "GPL-3.0-or-later"
 
 [features]
 default = []

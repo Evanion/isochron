@@ -102,4 +102,4 @@ chronohub/cleaner/
 
 ## License
 
-This project is licensed under [LICENSE_TYPE] - see LICENSE file for details.
+This project is licensed under the GNU General Public License v3.0 or later - see [LICENSE](../LICENSE) for details.

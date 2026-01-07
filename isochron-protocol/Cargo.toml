@@ -3,7 +3,7 @@ name = "isochron-protocol"
 version = "0.1.0"
 edition = "2021"
 description = "V0 Display communication protocol for Isochron watch cleaner"
-license = "MIT OR Apache-2.0"
+license = "GPL-3.0-or-later"
 
 # This crate is no_std compatible but can also be tested on host
 [features]

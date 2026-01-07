@@ -48,4 +48,11 @@ cargo build --release
 
 ## License
 
-See LICENSE file for details.
+This project is licensed under the **GNU General Public License v3.0 or later** (GPL-3.0-or-later).
+
+This means:
+- You can use, modify, and distribute this software
+- If you distribute devices with this firmware, you must provide source code and allow users to install modified versions
+- Derivative works must also be licensed under GPLv3
+
+See [LICENSE](LICENSE) for the full license text.
