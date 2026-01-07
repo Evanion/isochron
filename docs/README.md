@@ -17,6 +17,7 @@ Isochron is embedded firmware for automated watch cleaning machines, running on 
 | [Installation Guide](Installation.md) | Install tools, build firmware, flash to board |
 | [Configuration Reference](Config_Reference.md) | All configuration options (Klipper-style) |
 | [Supported Boards](Boards.md) | Hardware compatibility and pinouts |
+| [Machine Design](Machine_Design.md) | Mechanical and electrical design guidelines |
 
 ### For Developers
 
