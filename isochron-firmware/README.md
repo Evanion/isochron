@@ -1,5 +1,8 @@
 # isochron-firmware
 
+> **Warning**
+> This is **alpha software** under active development. APIs, configuration formats, and behavior may change without notice. Not recommended for production use.
+
 Embedded firmware for the Isochron watch cleaning machine, targeting RP2040-based boards (SKR Pico).
 
 ## Prerequisites
