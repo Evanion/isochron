@@ -22,15 +22,18 @@ Defines a stepper motor. The `name` identifies this stepper (e.g., `basket`, `z`
 
 ```toml
 [stepper basket]
-step_pin = "gpio11"
+step_pin = "gpio14"
 #   The GPIO pin for step pulses. This parameter must be provided.
+#   For BTT SKR Pico: basket motor uses E connector (GPIO14).
 
-dir_pin = "gpio10"
+dir_pin = "gpio13"
 #   The GPIO pin for direction control. This parameter must be provided.
+#   For BTT SKR Pico: basket motor uses E connector (GPIO13).
 
-enable_pin = "!gpio12"
+enable_pin = "!gpio15"
 #   The GPIO pin for motor enable. Prefix with ! for active-low (inverted).
 #   This parameter must be provided.
+#   For BTT SKR Pico: basket motor uses E connector (GPIO15).
 
 #endstop_pin = "^gpio4"
 #   The GPIO pin for the endstop switch. Prefix with ^ for pull-up.
@@ -560,9 +563,9 @@ Here's a complete configuration for a manual 4-jar watch cleaning machine:
 # === STEPPERS ===
 
 [stepper basket]
-step_pin = "gpio11"
-dir_pin = "gpio10"
-enable_pin = "!gpio12"
+step_pin = "gpio14"
+dir_pin = "gpio13"
+enable_pin = "!gpio15"
 full_steps_per_rotation = 200
 microsteps = 16
 rotation_distance = 360
@@ -571,11 +574,10 @@ gear_ratio = "3:1"
 [tmc2209 basket]
 uart_tx_pin = "gpio8"
 uart_rx_pin = "gpio9"
-uart_address = 0
+uart_address = 3                # E slot is address 3
 run_current = 0.8
 hold_current = 0.4
 stealthchop = true
-diag_pin = "gpio17"
 
 # === HEATERS ===
 

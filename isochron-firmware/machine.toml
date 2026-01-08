@@ -16,12 +16,18 @@ version = 1
 # =============================================================================
 # STEPPERS
 # =============================================================================
+# Motor to board connector mapping (BTT SKR Pico):
+#   basket → E slot (GPIO 14, 13, 15)
+#   x      → X slot (GPIO 11, 10, 12)
+#   z      → Z slot (GPIO 19, 28, 2)
+#   lid    → Y slot (GPIO 6, 5, 7)
 
 # Basket motor (rotates parts in solution) - always required
+# Uses E connector on BTT SKR Pico
 [stepper.basket]
-step_pin = "gpio11"
-dir_pin = "gpio10"
-enable_pin = "!gpio12"
+step_pin = "gpio14"
+dir_pin = "gpio13"
+enable_pin = "!gpio15"
 rotation_distance = 360             # degrees per motor rotation
 gear_ratio = "3:1"                  # 3:1 belt reduction
 full_steps_per_rotation = 200       # 1.8 degree motor
@@ -29,53 +35,74 @@ microsteps = 16
 
 # TMC2209 driver configuration for basket motor
 [tmc2209.basket]
-uart_address = 0
+uart_address = 3                    # E driver is address 3
 run_current = 800                   # mA
 hold_current = 400                  # mA (optional, defaults to 50% of run)
 stealthchop = true
 stallguard_threshold = 80
 
-# Z motor (raises/lowers basket) - optional for automated machines
-# Uncomment to enable:
-#
-# [stepper.z]
-# step_pin = "gpio6"
-# dir_pin = "gpio5"
-# enable_pin = "!gpio7"
-# rotation_distance = 8             # mm per leadscrew rotation
-# full_steps_per_rotation = 200
-# microsteps = 16
-# endstop_pin = "^gpio4"            # physical endstop with pull-up
-# position_endstop = 0              # mm at endstop
-# position_max = 150                # mm max travel
-# homing_speed = 10                 # mm/s
-#
-# [tmc2209.z]
-# uart_address = 1
-# run_current = 800
-# stealthchop = true
-# stallguard_threshold = 60
-
-# X motor (rotates between jars) - optional for automated machines
+# X motor (jar selection/carousel) - optional for automated machines
+# Uses X connector on BTT SKR Pico
 # Uncomment to enable:
 #
 # [stepper.x]
-# step_pin = "gpio19"
-# dir_pin = "gpio28"
-# enable_pin = "!gpio2"
+# step_pin = "gpio11"
+# dir_pin = "gpio10"
+# enable_pin = "!gpio12"
 # rotation_distance = 360           # degrees per motor rotation
 # gear_ratio = "5:1"
+# full_steps_per_rotation = 200
 # microsteps = 16
-# endstop_pin = "^gpio16"           # home switch
+# endstop_pin = "^gpio4"            # X endstop
 # position_endstop = 0              # degrees at home
 # position_max = 360                # degrees (full rotation)
 # homing_speed = 30                 # deg/s
 #
 # [tmc2209.x]
-# uart_address = 2
+# uart_address = 0                  # X driver is address 0
 # run_current = 600
 # stealthchop = true
 # stallguard_threshold = 60
+
+# Z motor (raises/lowers basket) - optional for automated machines
+# Uses Z connector on BTT SKR Pico
+# Uncomment to enable:
+#
+# [stepper.z]
+# step_pin = "gpio19"
+# dir_pin = "gpio28"
+# enable_pin = "!gpio2"
+# rotation_distance = 8             # mm per leadscrew rotation
+# full_steps_per_rotation = 200
+# microsteps = 16
+# endstop_pin = "^gpio25"           # Z endstop
+# position_endstop = 0              # mm at endstop
+# position_max = 150                # mm max travel
+# homing_speed = 10                 # mm/s
+#
+# [tmc2209.z]
+# uart_address = 2                  # Z driver is address 2
+# run_current = 800
+# stealthchop = true
+# stallguard_threshold = 60
+
+# Lid motor (opens/closes jar lids) - optional
+# Uses Y connector on BTT SKR Pico
+# Uncomment to enable:
+#
+# [stepper.lid]
+# step_pin = "gpio6"
+# dir_pin = "gpio5"
+# enable_pin = "!gpio7"
+# rotation_distance = 360           # degrees per motor rotation
+# full_steps_per_rotation = 200
+# microsteps = 16
+# endstop_pin = "^gpio3"            # Y endstop
+#
+# [tmc2209.lid]
+# uart_address = 1                  # Y driver is address 1
+# run_current = 400
+# stealthchop = true
 
 # =============================================================================
 # HEATERS

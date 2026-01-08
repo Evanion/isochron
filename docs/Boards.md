@@ -39,13 +39,13 @@ The **BigTreeTech SKR Pico** is the primary supported board. It's a 3D printer c
 SKR Pico v1.0 Pin Assignments
 ═══════════════════════════════════════════════════════════════
 
-STEPPER X (Spin Motor)         STEPPER Y (Lift - Optional)
+STEPPER X (x motor)            STEPPER Y (lid motor)
 ├─ STEP:   GPIO11              ├─ STEP:   GPIO6
 ├─ DIR:    GPIO10              ├─ DIR:    GPIO5
 ├─ ENABLE: GPIO12 (active low) ├─ ENABLE: GPIO7 (active low)
 └─ DIAG:   GPIO17              └─ DIAG:   GPIO3
 
-STEPPER Z (Tower - Optional)   STEPPER E (Lid - Optional)
+STEPPER Z (z motor)            STEPPER E (basket motor)
 ├─ STEP:   GPIO19              ├─ STEP:   GPIO14
 ├─ DIR:    GPIO28              ├─ DIR:    GPIO13
 ├─ ENABLE: GPIO2 (active low)  ├─ ENABLE: GPIO15 (active low)
@@ -75,13 +75,18 @@ OTHER
 
 The default firmware config uses these assignments:
 
+| Motor | Connector | Pins | TMC ADDR |
+|-------|-----------|------|----------|
+| basket | Stepper E | STEP=14, DIR=13, EN=15 | 3 |
+| x (optional) | Stepper X | STEP=11, DIR=10, EN=12 | 0 |
+| z (optional) | Stepper Z | STEP=19, DIR=28, EN=2 | 2 |
+| lid (optional) | Stepper Y | STEP=6, DIR=5, EN=7 | 1 |
+
 | Function | Hardware | Pins |
 |----------|----------|------|
-| Spin Motor | Stepper X | STEP=11, DIR=10, EN=12 |
-| TMC2209 | UART bus | TX=8, RX=9, ADDR=0 |
+| TMC2209 | UART bus | TX=8, RX=9 |
 | Dryer Heater | HE0 | OUT=23, THERM=27 |
 | Display | UART0 | TX=0, RX=1 |
-| Stall Detect | DIAG X | GPIO17 |
 
 ### Connector Reference
 
@@ -92,10 +97,10 @@ The default firmware config uses these assignments:
 │                                                              │
 │  [PWR]  24V power input (VIN, GND)                          │
 │                                                              │
-│  [X]    Stepper X connector (spin motor)                    │
-│  [Y]    Stepper Y connector (optional lift)                 │
-│  [Z]    Stepper Z connector (optional tower)                │
-│  [E]    Stepper E connector (optional lid)                  │
+│  [X]    Stepper X connector (x motor - jar selection)       │
+│  [Y]    Stepper Y connector (lid motor)                     │
+│  [Z]    Stepper Z connector (z motor - lift)                │
+│  [E]    Stepper E connector (basket motor)                  │
 │                                                              │
 │  [HE0]  Heater 0 output (dryer heater) ← Use this          │
 │  [HB]   Heated bed output (spare)                           │
@@ -167,7 +172,7 @@ For a basic manual cleaning machine:
 
 | Component | Purpose |
 |-----------|---------|
-| 1x Stepper motor | Basket spin |
+| 1x Stepper motor | Basket rotation |
 | 1x TMC2209 driver | Motor control |
 | 1x Heater + thermistor | Drying chamber |
 | 1x V0 Display | User interface |
@@ -178,7 +183,7 @@ For a fully automated cleaning machine:
 
 | Component | Purpose |
 |-----------|---------|
-| 4x Stepper motors | Spin, lift, tower, lid |
+| 4x Stepper motors | basket, x, z, lid |
 | 4x TMC2209 drivers | Motor control |
 | 1-4x Heaters | Per-jar heating |
 | 1x V0 Display | User interface |

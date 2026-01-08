@@ -369,18 +369,27 @@ StallGuard threshold is configured via UART during TMC initialization:
 
 ## Pin Assignments (SKR Pico)
 
+See `docs/Boards.md` for complete pinout documentation.
+
+### Motor Connectors
+
+| Motor | Connector | STEP | DIR | EN | TMC ADDR |
+|-------|-----------|------|-----|-----|----------|
+| basket | E | GPIO14 | GPIO13 | GPIO15 | 3 |
+| x | X | GPIO11 | GPIO10 | GPIO12 | 0 |
+| z | Z | GPIO19 | GPIO28 | GPIO2 | 2 |
+| lid | Y | GPIO6 | GPIO5 | GPIO7 | 1 |
+
+### Peripherals
+
 | Function | GPIO | Notes |
 |----------|------|-------|
-| STEP | GPIO11 | Stepper X step |
-| DIR | GPIO10 | Stepper X direction |
-| ENABLE | GPIO12 | Stepper X enable (active low) |
-| TMC TX | GPIO8 | TMC2209 UART TX |
-| TMC RX | GPIO9 | TMC2209 UART RX |
-| TMC DIAG | GPIO17 | StallGuard output |
+| TMC TX | GPIO8 | TMC2209 shared UART |
+| TMC RX | GPIO9 | TMC2209 shared UART |
 | Display TX | GPIO0 | UART0 to V0 Display |
 | Display RX | GPIO1 | UART0 from V0 Display |
-| Heater | GPIO23 | HE0 output |
-| Thermistor | GPIO27 | TH0 ADC input |
+| Heater | GPIO23 | HE0 output (dryer) |
+| Thermistor | GPIO27 | TH0 ADC input (dryer) |
 
 ---
 
