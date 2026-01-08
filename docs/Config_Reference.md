@@ -175,7 +175,7 @@ sensor_pin = "gpio27"
 #control = "bang_bang"
 #   The control algorithm. Options:
 #   - "bang_bang": Simple on/off with hysteresis
-#   - "pid": PID control (future support)
+#   - "pid": PID control with time-proportioning output
 #   The default is "bang_bang".
 
 #max_temp = 55
@@ -185,7 +185,56 @@ sensor_pin = "gpio27"
 #hysteresis = 2
 #   Temperature hysteresis in °C for bang-bang control. Heater turns
 #   off at target, turns on at (target - hysteresis). The default is 2.
+#   Only used when control = "bang_bang".
+
+#pid_kp = 1.5
+#   PID proportional gain. Controls response to current error.
+#   Higher values = faster response but may overshoot.
+#   Only used when control = "pid". Can be set manually or via autotune.
+
+#pid_ki = 0.1
+#   PID integral gain. Eliminates steady-state error over time.
+#   Higher values = faster error correction but may cause oscillation.
+#   Only used when control = "pid". Can be set manually or via autotune.
+
+#pid_kd = 0.5
+#   PID derivative gain. Dampens oscillation and improves stability.
+#   Higher values = more damping but may slow response.
+#   Only used when control = "pid". Can be set manually or via autotune.
 ```
+
+#### PID Control
+
+When `control = "pid"` is set, the heater uses a PID controller with time-proportioning output. Since the heater is on/off (not PWM capable), the controller modulates the duty cycle over a 10-second period.
+
+**PID Coefficient Priority:**
+1. Values in TOML config (highest priority - manual override)
+2. Values saved in flash from autotune
+3. Default values (zeros - effectively disables PID output)
+
+**Coefficient Format:**
+PID coefficients can be specified as:
+- Float values: `pid_kp = 1.5`
+- Scaled integers (×100): `pid_kp = 150` (equivalent to 1.50)
+
+#### Autotune
+
+The firmware includes an autotune feature that automatically determines optimal PID coefficients using the Åström-Hägglund relay method with Ziegler-Nichols tuning rules.
+
+**Autotune Process:**
+1. Navigate to "Autotune Heater" in the menu
+2. Confirm the target temperature (default: 45°C)
+3. The heater oscillates around the setpoint while collecting data
+4. After 12+ oscillation peaks, coefficients are calculated
+5. Results can be saved to flash for persistent storage
+
+**Autotune Duration:** Typically 5-15 minutes depending on heater/thermal mass.
+
+**Autotune Abort Conditions:**
+- Temperature exceeds `max_temp` (safety cutoff)
+- Timeout after 20 minutes
+- Sensor fault detected
+- User cancellation (long-press encoder)
 
 #### Heater Safety
 
@@ -193,7 +242,8 @@ The firmware monitors heaters for safety:
 
 - **Over-temperature**: Triggers fault if temp exceeds `max_temp`
 - **Sensor fault**: Triggers fault if sensor reads open/short circuit
-- **State enforcement**: Heater only operates in `Running` state
+- **State enforcement**: Heater only operates in `Running` or `Autotuning` states
+- **Thermal fuse**: Hardware backup recommended (see Machine Design guide)
 
 ---
 
@@ -528,9 +578,12 @@ diag_pin = "gpio17"
 heater_pin = "gpio23"
 sensor_pin = "gpio27"
 sensor_type = "ntc100k"
-control = "bang_bang"
+control = "pid"           # Use PID for better temperature stability
 max_temp = 55
-hysteresis = 2
+# PID coefficients - run autotune to determine optimal values
+# pid_kp = 1.5
+# pid_ki = 0.1
+# pid_kd = 0.5
 
 # === DISPLAY ===
 

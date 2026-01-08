@@ -402,6 +402,27 @@ fn parse_control_mode(value: &str) -> Result<HeaterControlMode, ParseError> {
     }
 }
 
+/// Parse PID coefficient value
+///
+/// Accepts either:
+/// - Float format: "1.5" -> 150 (×100)
+/// - Integer format: "150" -> 150 (already ×100)
+///
+/// Returns value × 100 as i16.
+fn parse_pid_value(value: &str) -> Result<i16, ParseError> {
+    let value = value.trim();
+
+    if value.contains('.') {
+        // Parse as float and convert to ×100
+        let f: f32 = value.parse().map_err(|_| ParseError::InvalidValue)?;
+        let scaled = (f * 100.0) as i16;
+        Ok(scaled)
+    } else {
+        // Parse as integer (already ×100)
+        parse_int(value)
+    }
+}
+
 /// Parse gear ratio string like "3:1"
 fn parse_gear_ratio(value: &str) -> Result<(u8, u8), ParseError> {
     let value = parse_string(value)?;
@@ -561,6 +582,9 @@ fn apply_value(
                 "control" => h.control = parse_control_mode(value)?,
                 "max_temp" => h.max_temp = parse_int(value)?,
                 "hysteresis" => h.hysteresis = parse_int(value)?,
+                "pid_kp" => h.pid_kp_x100 = Some(parse_pid_value(value)?),
+                "pid_ki" => h.pid_ki_x100 = Some(parse_pid_value(value)?),
+                "pid_kd" => h.pid_kd_x100 = Some(parse_pid_value(value)?),
                 _ => {}
             }
         }
@@ -847,5 +871,38 @@ uart_rx_pin = "gpio1"
         assert_eq!(config.steppers[0].step_pin.pin, 11);
         assert!(config.steppers[0].enable_pin.inverted);
         assert_eq!(config.display.uart_tx_pin, 0);
+    }
+
+    #[test]
+    fn test_parse_pid_value() {
+        // Float format
+        assert_eq!(parse_pid_value("1.5").unwrap(), 150);
+        assert_eq!(parse_pid_value("0.1").unwrap(), 10);
+        assert_eq!(parse_pid_value("2.0").unwrap(), 200);
+        assert_eq!(parse_pid_value("0.05").unwrap(), 5);
+
+        // Integer format (already ×100)
+        assert_eq!(parse_pid_value("150").unwrap(), 150);
+        assert_eq!(parse_pid_value("10").unwrap(), 10);
+    }
+
+    #[test]
+    fn test_parse_heater_with_pid() {
+        let config_str = r#"
+[heater_control dryer]
+control = "pid"
+max_temp = 55
+pid_kp = 1.5
+pid_ki = 0.1
+pid_kd = 0.5
+"#;
+
+        let config = parse_config(config_str).unwrap();
+        assert_eq!(config.heaters.len(), 1);
+        assert_eq!(config.heaters[0].name.as_str(), "dryer");
+        assert_eq!(config.heaters[0].control, HeaterControlMode::Pid);
+        assert_eq!(config.heaters[0].pid_kp_x100, Some(150));
+        assert_eq!(config.heaters[0].pid_ki_x100, Some(10));
+        assert_eq!(config.heaters[0].pid_kd_x100, Some(50));
     }
 }

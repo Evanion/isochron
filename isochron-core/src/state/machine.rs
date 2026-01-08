@@ -31,6 +31,8 @@ pub enum State {
     StepComplete,
     /// All steps completed successfully
     ProgramComplete,
+    /// PID autotune in progress
+    Autotuning,
     /// Fault detected; outputs disabled
     Error(ErrorKind),
 }
@@ -61,9 +63,9 @@ impl State {
 
     /// Check if this state allows heater operation
     pub fn heater_allowed(&self) -> bool {
-        // Heater only allowed during Running state, never during SpinOff
-        // (basket is out of solution during spin-off)
-        matches!(self, State::Running)
+        // Heater allowed during Running and Autotuning states
+        // Not during SpinOff (basket is out of solution)
+        matches!(self, State::Running | State::Autotuning)
     }
 
     /// Check if this is an error state
@@ -90,6 +92,7 @@ impl State {
 
             // Idle transitions
             (Idle, SelectProgram) => ProgramSelected,
+            (Idle, StartAutotune) => Autotuning,
             (Idle, ErrorDetected(kind)) => Error(kind),
 
             // ProgramSelected transitions
@@ -146,6 +149,12 @@ impl State {
             (ProgramComplete, SelectProgram) => ProgramSelected,
             (ProgramComplete, Back) => Idle,
             (ProgramComplete, ErrorDetected(kind)) => Error(kind),
+
+            // Autotuning transitions
+            (Autotuning, AutotuneComplete) => Idle,
+            (Autotuning, AutotuneFailed) => Idle,
+            (Autotuning, CancelAutotune) => Idle,
+            (Autotuning, ErrorDetected(kind)) => Error(kind),
 
             // Error transitions
             (Error(_), AcknowledgeError) => Idle,
@@ -250,8 +259,36 @@ mod tests {
     #[test]
     fn test_heater_allowed() {
         assert!(State::Running.heater_allowed());
+        assert!(State::Autotuning.heater_allowed()); // Heater needed for autotune
         assert!(!State::SpinOff.heater_allowed()); // No heater during spin-off
         assert!(!State::Idle.heater_allowed());
         assert!(!State::Paused.heater_allowed());
+    }
+
+    #[test]
+    fn test_autotune_flow() {
+        // Start autotune from idle
+        let idle = State::Idle;
+        let autotuning = idle.transition(Event::StartAutotune);
+        assert_eq!(autotuning, State::Autotuning);
+
+        // Complete autotune
+        let complete = autotuning.transition(Event::AutotuneComplete);
+        assert_eq!(complete, State::Idle);
+
+        // Failed autotune returns to idle
+        let autotuning = State::Autotuning;
+        let failed = autotuning.transition(Event::AutotuneFailed);
+        assert_eq!(failed, State::Idle);
+
+        // Cancelled autotune returns to idle
+        let autotuning = State::Autotuning;
+        let cancelled = autotuning.transition(Event::CancelAutotune);
+        assert_eq!(cancelled, State::Idle);
+
+        // Error during autotune
+        let autotuning = State::Autotuning;
+        let error = autotuning.transition(Event::ErrorDetected(ErrorKind::OverTemperature));
+        assert!(matches!(error, State::Error(ErrorKind::OverTemperature)));
     }
 }
