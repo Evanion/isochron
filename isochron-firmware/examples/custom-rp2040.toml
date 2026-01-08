@@ -1,0 +1,162 @@
+# Isochron Watch Cleaner - Custom RP2040 Board Template
+#
+# Use this template for custom RP2040-based boards with your own pin mappings.
+# Fill in the GPIO numbers for your specific board layout.
+#
+# Pin format:
+#   gpio11     - GPIO pin 11
+#   !gpio12    - GPIO pin 12, active low (inverted)
+#   ^gpio4     - GPIO pin 4 with internal pull-up resistor
+#   ^!gpio4    - Inverted with pull-up
+#
+# Usage:
+#   cp examples/custom-rp2040.toml machine.toml
+#   # Edit GPIO numbers for your board
+#   cargo build --release
+
+[machine]
+version = 1
+
+# =============================================================================
+# STEPPERS
+# =============================================================================
+# Customize these pin numbers for your board.
+# You need at minimum the basket motor.
+
+[stepper.basket]
+step_pin = "gpio?"           # <-- Your step pin
+dir_pin = "gpio?"            # <-- Your direction pin
+enable_pin = "!gpio?"        # <-- Your enable pin (usually active-low)
+rotation_distance = 360      # degrees per motor rotation
+gear_ratio = "1:1"           # Adjust for your gearing
+full_steps_per_rotation = 200
+microsteps = 16
+
+# TMC2209 driver (if using)
+[tmc2209.basket]
+uart_address = 0             # <-- Your TMC UART address
+run_current = 800
+hold_current = 400
+stealthchop = true
+
+# Optional motors - uncomment and configure as needed:
+
+# [stepper.x]
+# step_pin = "gpio?"
+# dir_pin = "gpio?"
+# enable_pin = "!gpio?"
+# rotation_distance = 360
+# gear_ratio = "1:1"
+# full_steps_per_rotation = 200
+# microsteps = 16
+# endstop_pin = "^gpio?"
+# position_endstop = 0
+# position_max = 360
+# homing_speed = 30
+
+# [stepper.z]
+# step_pin = "gpio?"
+# dir_pin = "gpio?"
+# enable_pin = "!gpio?"
+# rotation_distance = 8        # mm per leadscrew rotation
+# full_steps_per_rotation = 200
+# microsteps = 16
+# endstop_pin = "^gpio?"
+# position_endstop = 0
+# position_max = 150
+# homing_speed = 10
+
+# =============================================================================
+# HEATERS
+# =============================================================================
+
+[heater.dryer]
+heater_pin = "gpio?"         # <-- Your heater MOSFET pin
+sensor_pin = "gpio?"         # <-- Your thermistor ADC pin
+sensor_type = "ntc100k"      # ntc100k, ntc10k, pt1000
+control = "bang_bang"        # bang_bang or pid
+max_temp = 55
+hysteresis = 2
+
+# =============================================================================
+# JARS
+# =============================================================================
+
+[jar.clean]
+x_pos = 0
+z_pos = 120
+
+[jar.rinse1]
+x_pos = 90
+z_pos = 120
+
+[jar.rinse2]
+x_pos = 180
+z_pos = 120
+
+[jar.dry]
+x_pos = 270
+z_pos = 100
+heater = "dryer"
+
+# =============================================================================
+# PROFILES
+# =============================================================================
+
+[profile.clean]
+label = "Clean"
+rpm = 120
+time_s = 180
+direction = "alternate"
+iterations = 3
+
+[profile.rinse]
+label = "Rinse"
+rpm = 100
+time_s = 120
+direction = "cw"
+iterations = 1
+
+[profile.dry]
+label = "Dry"
+rpm = 60
+time_s = 600
+direction = "alternate"
+iterations = 6
+temperature_c = 45
+
+# =============================================================================
+# PROGRAMS
+# =============================================================================
+
+[program.full_clean]
+label = "Full Clean"
+steps = [
+    { jar = "clean", profile = "clean" },
+    { jar = "rinse1", profile = "rinse" },
+    { jar = "rinse2", profile = "rinse" },
+    { jar = "dry", profile = "dry" },
+]
+
+[program.quick_clean]
+label = "Quick Clean"
+steps = [
+    { jar = "clean", profile = "clean" },
+    { jar = "rinse1", profile = "rinse" },
+]
+
+[program.dry_only]
+label = "Dry Only"
+steps = [
+    { jar = "dry", profile = "dry" },
+]
+
+# =============================================================================
+# DISPLAY (optional)
+# =============================================================================
+
+[display]
+type = "v0_display"
+uart_tx_pin = "gpio?"        # <-- Your UART TX pin
+uart_rx_pin = "gpio?"        # <-- Your UART RX pin
+baud = 115200

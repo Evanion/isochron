@@ -2,6 +2,16 @@
 #
 # Example configuration for machines using AC motors with relay control.
 # Common for industrial retrofits or repurposed ultrasonic cleaners.
+#
+# AC motors are controlled via relay modules (solid state or mechanical).
+# Speed control is NOT available - AC motors run at fixed speed.
+#
+# WARNING: AC mains voltage is dangerous. Ensure proper isolation,
+# grounding, and safety interlocks. Use SSRs rated for your voltage.
+#
+# Usage:
+#   cp examples/ac-motor.toml machine.toml
+#   cargo build --release
 
 [machine]
 version = 1
@@ -10,30 +20,34 @@ motor_type = "ac"  # dc, ac, or stepper
 # =============================================================================
 # AC MOTORS
 # =============================================================================
-# AC motors are controlled via relay modules (solid state or mechanical).
-# Each motor has enable (on/off) and optional direction (for reversible motors).
-# Speed control is NOT available - AC motors run at fixed speed.
+# Motor to board connector mapping (BTT SKR Pico):
+#   basket → E slot (GPIO 14, 13, 15)
+#   x      → X slot (GPIO 11, 10, 12)
+#   z      → Z slot (GPIO 19, 28, 2)
+#   lid    → Y slot (GPIO 6, 5, 7)
 
-[ac_motor.spin]
-enable_pin = "gpio11"           # Relay control
-direction_pin = "gpio10"        # For reversible motors (optional)
+[ac_motor.basket]
+enable_pin = "gpio14"           # Relay control (E connector)
+direction_pin = "gpio13"        # For reversible motors (optional)
 relay_type = "ssr"              # ssr (solid state) or mechanical
 active_high = true              # Relay activation polarity
 
-[ac_motor.lift]
-enable_pin = "gpio6"
-relay_type = "mechanical"
-active_high = true
-# Limit switches for safety
-endstop_up = "^gpio4"
-endstop_down = "^gpio3"
+# Optional: Z axis (lift) - uncomment to enable
+# [ac_motor.z]
+# enable_pin = "gpio19"           # Z connector
+# relay_type = "mechanical"
+# active_high = true
+# # Limit switches for safety
+# endstop_up = "^gpio25"
+# endstop_down = "^gpio3"
 
-[ac_motor.tower]
-enable_pin = "gpio19"
-direction_pin = "gpio28"
-relay_type = "ssr"
-active_high = true
-endstop_home = "^gpio16"
+# Optional: X axis (carousel) - uncomment to enable
+# [ac_motor.x]
+# enable_pin = "gpio11"           # X connector
+# direction_pin = "gpio10"
+# relay_type = "ssr"
+# active_high = true
+# endstop_home = "^gpio4"
 
 # =============================================================================
 # SAFETY SETTINGS
@@ -45,7 +59,7 @@ interlock_enabled = true        # Prevent multiple motors running simultaneously
 voltage = 120                   # For documentation/safety labels (120 or 240)
 
 # =============================================================================
-# HEATERS (same as other configs)
+# HEATERS
 # =============================================================================
 
 [heater.dryer]
@@ -57,31 +71,31 @@ max_temp = 55
 hysteresis = 2
 
 # =============================================================================
-# JARS (same as other configs)
+# JARS
 # =============================================================================
 
 [jar.clean]
-tower_pos = 0
-lift_pos = 120
+x_pos = 0
+z_pos = 120
 
 [jar.rinse1]
-tower_pos = 90
-lift_pos = 120
+x_pos = 90
+z_pos = 120
 
 [jar.rinse2]
-tower_pos = 180
-lift_pos = 120
+x_pos = 180
+z_pos = 120
 
 [jar.dry]
-tower_pos = 270
-lift_pos = 100
+x_pos = 270
+z_pos = 100
 heater = "dryer"
 
 # =============================================================================
 # PROFILES (AC motor version)
 # =============================================================================
 # Note: AC motors have no speed control - they run at fixed speed.
-# The 'speed' field is ignored for AC motors.
+# The 'rpm' and 'speed' fields are ignored for AC motors.
 
 [profile.clean]
 label = "Clean"
@@ -103,7 +117,7 @@ iterations = 6
 temperature_c = 45
 
 # =============================================================================
-# PROGRAMS (same as other configs)
+# PROGRAMS
 # =============================================================================
 
 [program.full_clean]
@@ -122,12 +136,18 @@ steps = [
     { jar = "rinse1", profile = "rinse" },
 ]
 
+[program.dry_only]
+label = "Dry Only"
+steps = [
+    { jar = "dry", profile = "dry" },
+]
+
 # =============================================================================
 # DISPLAY
 # =============================================================================
 
 [display]
-type = "direct_oled"         # I2C OLED on controller
-i2c_sda = "gpio0"
-i2c_scl = "gpio1"
-address = 0x3C
+type = "v0_display"
+uart_tx_pin = "gpio0"
+uart_rx_pin = "gpio1"
+baud = 115200
