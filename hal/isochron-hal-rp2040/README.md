@@ -27,9 +27,9 @@ make build
 
 ## Pin Configuration
 
-Pin assignments are defined in board configuration files:
-- `configs/boards/btt-pico.toml` - BTT SKR Pico
-- `configs/boards/pico.toml` - Raspberry Pi Pico
+Pin assignments are defined in `isochron-firmware/machine.toml`. See examples:
+- `isochron-firmware/examples/btt-pico.toml` - BTT SKR Pico
+- `isochron-firmware/examples/custom-rp2040.toml` - Custom boards
 
 ## Dependencies
 

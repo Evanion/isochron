@@ -97,7 +97,7 @@ The BTT SKR Pico is the reference board, designed for 3D printers but perfect fo
 - UART header for display
 - Well-documented pinout
 
-**Pin Mapping:** See `configs/boards/btt-pico.toml`
+**Configuration:** See `isochron-firmware/examples/btt-pico.toml`
 
 ### Raspberry Pi Pico
 
@@ -113,16 +113,16 @@ Standard development board, requires external components:
 - MOSFET module for heater
 - Voltage divider for thermistor
 
-**Pin Mapping:** See `configs/boards/pico.toml`
+**Configuration:** Copy `isochron-firmware/examples/custom-rp2040.toml` and customize pins
 
 ### Custom Boards
 
 Create your own configuration:
 
-1. Copy `configs/boards/custom-rp2040.toml.example`
-2. Rename to your board name
-3. Update pin assignments
-4. Create a profile or use directly
+1. Copy `isochron-firmware/examples/custom-rp2040.toml` to `isochron-firmware/machine.toml`
+2. Update GPIO pin numbers for your board
+3. Configure motors, heaters, jars, and profiles
+4. Save as a profile with `make save-profile PROFILE=my-board`
 
 ## Stepper Drivers
 
@@ -187,7 +187,9 @@ Use the `pico-ac-motor` profile for AC motor builds.
 
 ### Configuration Examples
 
-**DC Motor** (`configs/machines/examples/dc-motor-basic.toml`):
+All motor configuration is done in `isochron-firmware/machine.toml`. See the examples directory for complete configurations.
+
+**DC Motor** (from `machine.toml`):
 
 ```toml
 [machine]
@@ -204,7 +206,7 @@ soft_start_ms = 500
 soft_stop_ms = 300
 ```
 
-**AC Motor** (`configs/machines/examples/ac-motor-basic.toml`):
+**AC Motor** (from `machine.toml`):
 
 ```toml
 [machine]

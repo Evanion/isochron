@@ -17,7 +17,6 @@ OUT_DIR := out
 PROFILE_DIR := profiles
 SHIPPED_PROFILES := $(PROFILE_DIR)/shipped
 USER_PROFILES := $(PROFILE_DIR)/user
-CONFIG_DIR := configs
 
 # Tools
 CARGO := cargo
@@ -87,7 +86,6 @@ defconfig:
 	@echo "CONFIG_DISPLAY_V0_MINI=y" >> .config
 	@echo "CONFIG_BUILD_DISPLAY_FW=y" >> .config
 	@echo "CONFIG_DISPLAY_UART_BAUD=115200" >> .config
-	@echo "CONFIG_MACHINE_CONFIG=\"configs/machines/default.toml\"" >> .config
 	@echo "CONFIG_MACHINE_NAME=\"Isochron Cleaner\"" >> .config
 	@echo "CONFIG_FEATURE_USB_SERIAL=y" >> .config
 	@echo "CONFIG_FEATURE_WATCHDOG=y" >> .config

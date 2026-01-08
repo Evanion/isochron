@@ -31,9 +31,8 @@ isochron/
 ├── isochron-drivers/           # Device drivers (motors, heaters)
 ├── isochron-protocol/          # UART protocol
 ├── isochron-firmware/          # Main controller firmware
-├── configs/                     # Configuration files
-│   ├── boards/                 # Board pin mappings
-│   └── machines/               # Machine configurations
+│   ├── machine.toml            # Machine configuration (embedded at build)
+│   └── examples/               # Example configurations
 ├── profiles/                    # Build profiles (like Klipper)
 ├── Kconfig                     # Build configuration schema
 └── Makefile                    # Build system
