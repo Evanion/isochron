@@ -111,7 +111,6 @@ pub struct StepperHwConfig {
     pub gear_ratio_den: u8,
 
     // === Position control (Klipper-style) ===
-
     /// Minimum valid position in mm (default: 0)
     pub position_min: i32,
     /// Maximum valid position in mm (required for position-controlled steppers)
@@ -197,7 +196,6 @@ pub struct DcMotorHwConfig {
     pub endstop_home: Option<PinConfig>,
 
     // === Position control (Klipper-style) ===
-
     /// Minimum valid position in mm (default: 0)
     pub position_min: i32,
     /// Maximum valid position in mm (required for position-controlled motors)
@@ -241,7 +239,6 @@ pub struct AcMotorHwConfig {
     pub endstop_home: Option<PinConfig>,
 
     // === Position control (Klipper-style) ===
-
     /// Minimum valid position in mm (default: 0)
     pub position_min: i32,
     /// Maximum valid position in mm (required for position-controlled motors)
@@ -306,7 +303,6 @@ pub struct MachineConfig {
     pub motor_type: MotorType,
 
     // === Motion Safety ===
-
     /// Safe Z position for horizontal travel (mm)
     /// The basket lifts to this height before moving between jars.
     /// Should be high enough to clear jar rims and any obstructions.
@@ -315,7 +311,6 @@ pub struct MachineConfig {
     pub safe_z: Option<i32>,
 
     // === Hardware ===
-
     /// Stepper motor configurations (when motor_type = Stepper)
     pub steppers: Vec<StepperHwConfig, MAX_STEPPERS>,
     /// TMC2209 driver configurations (when motor_type = Stepper)
