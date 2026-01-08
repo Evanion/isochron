@@ -89,7 +89,8 @@ async fn main(spawner: Spawner) {
     info!("Peripherals initialized");
 
     // Load configuration from flash (or use embedded defaults)
-    let config = load_config_from_flash(p.FLASH, p.DMA_CH2).await;
+    // Also load calibration data and get flash storage back for persistence
+    let (config, calibration, flash_storage) = load_config_from_flash(p.FLASH, p.DMA_CH2).await;
 
     // Get motor type before extracting other config
     let motor_type = config.motor_type;
@@ -160,13 +161,29 @@ async fn main(spawner: Spawner) {
         None
     };
 
-    // Extract heater config values
+    // Extract heater config values including PID coefficients
     let heater_config_values = config.find_heater("dryer").map(|heater| {
         info!(
-            "Heater config: max_temp={}°C, hysteresis={}°C",
-            heater.max_temp, heater.hysteresis
+            "Heater config: max_temp={}°C, hysteresis={}°C, control={:?}",
+            heater.max_temp, heater.hysteresis, heater.control
         );
-        (heater.max_temp, heater.hysteresis)
+        if heater.pid_kp_x100.is_some()
+            || heater.pid_ki_x100.is_some()
+            || heater.pid_kd_x100.is_some()
+        {
+            info!(
+                "  PID from TOML: Kp={:?}, Ki={:?}, Kd={:?}",
+                heater.pid_kp_x100, heater.pid_ki_x100, heater.pid_kd_x100
+            );
+        }
+        (
+            heater.max_temp,
+            heater.hysteresis,
+            heater.control,
+            heater.pid_kp_x100,
+            heater.pid_ki_x100,
+            heater.pid_kd_x100,
+        )
     });
 
     // Now we can move config
@@ -302,22 +319,59 @@ async fn main(spawner: Spawner) {
     // Pin assignment is board-specific (SKR Pico HE0: GPIO23)
     let heater_pin = Output::new(p.PIN_23, Level::Low);
 
-    // Heater settings from config (already extracted above)
-    let heater_config = if let Some((max_temp, hysteresis)) = heater_config_values {
+    // Heater settings from config with calibration fallback
+    // Priority: TOML config > Calibration from flash > Defaults
+    let heater_config = if let Some((max_temp, hysteresis, control, toml_kp, toml_ki, toml_kd)) =
+        heater_config_values
+    {
+        // Get calibration values for heater 0 (dryer) if available
+        let cal = calibration.get(0);
+        let (cal_kp, cal_ki, cal_kd) = if let Some(c) = cal {
+            info!(
+                "Loaded PID calibration from flash: Kp={}.{:02}, Ki={}.{:02}, Kd={}.{:02}",
+                c.kp_x100 / 100,
+                (c.kp_x100 % 100).abs(),
+                c.ki_x100 / 100,
+                (c.ki_x100 % 100).abs(),
+                c.kd_x100 / 100,
+                (c.kd_x100 % 100).abs(),
+            );
+            (Some(c.kp_x100), Some(c.ki_x100), Some(c.kd_x100))
+        } else {
+            (None, None, None)
+        };
+
+        // TOML values take priority over calibration
+        let pid_kp = toml_kp.or(cal_kp).unwrap_or(0);
+        let pid_ki = toml_ki.or(cal_ki).unwrap_or(0);
+        let pid_kd = toml_kd.or(cal_kd).unwrap_or(0);
+
+        if pid_kp != 0 || pid_ki != 0 || pid_kd != 0 {
+            info!(
+                "Using PID coefficients: Kp={}.{:02}, Ki={}.{:02}, Kd={}.{:02}",
+                pid_kp / 100,
+                (pid_kp % 100).abs(),
+                pid_ki / 100,
+                (pid_ki % 100).abs(),
+                pid_kd / 100,
+                (pid_kd % 100).abs(),
+            );
+        }
+
         tasks::HeaterConfig {
+            control_mode: control,
             max_temp_c: max_temp,
             hysteresis_c: hysteresis,
             pullup_ohms: 4700, // Standard 4.7K pullup (could be configurable)
             adc_max: 4096,
+            pid_kp_x100: pid_kp,
+            pid_ki_x100: pid_ki,
+            pid_kd_x100: pid_kd,
+            ..Default::default()
         }
     } else {
         warn!("No dryer heater config found, using defaults");
-        tasks::HeaterConfig {
-            max_temp_c: 55,
-            hysteresis_c: 2,
-            pullup_ohms: 4700,
-            adc_max: 4096,
-        }
+        tasks::HeaterConfig::default()
     };
 
     info!("ADC and heater initialized");
@@ -435,6 +489,9 @@ async fn main(spawner: Spawner) {
         ))
         .unwrap();
     spawner
+        .spawn(tasks::calibration_task(flash_storage))
+        .unwrap();
+    spawner
         .spawn(tasks::controller_task(
             capabilities,
             programs,
@@ -463,20 +520,23 @@ fn init_heap() {
     }
 }
 
+use isochron_core::config::CalibrationData;
+
 /// Load configuration from flash storage
 ///
 /// Attempts to load TOML config from flash. If not found or invalid,
 /// returns the embedded default configuration.
+/// Also loads PID calibration data and returns the FlashStorage for future saves.
 async fn load_config_from_flash(
     flash: Peri<'static, FLASH>,
     dma: Peri<'static, DMA_CH2>,
-) -> MachineConfig {
+) -> (MachineConfig, CalibrationData, FlashStorage<'static>) {
     let flash_storage = FlashStorage::new(flash, dma);
     let mut persistence = ConfigPersistence::new(flash_storage);
 
     let default_config = create_default_config();
 
-    match persistence.load().await {
+    let config = match persistence.load().await {
         Ok(config) => {
             info!("Loaded configuration from flash");
             config
@@ -486,7 +546,15 @@ async fn load_config_from_flash(
             info!("No valid configuration in flash, using embedded defaults");
             default_config
         }
-    }
+    };
+
+    // Reclaim the storage to load calibration
+    let mut storage = persistence.into_storage();
+
+    // Load PID calibration data
+    let calibration = crate::config::load_calibration(&mut storage).await;
+
+    (config, calibration, storage)
 }
 
 /// Convert MachineConfig to static slices for task consumption

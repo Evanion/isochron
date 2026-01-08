@@ -18,6 +18,49 @@ use isochron_protocol::InputEvent;
 
 use heapless::Vec;
 
+/// Special menu item index for autotune (after programs)
+const AUTOTUNE_MENU_INDEX: u8 = 254;
+
+/// Default autotune target temperature (°C × 10)
+const AUTOTUNE_TARGET_X10: i16 = 450; // 45.0°C
+
+/// Autotune UI phase (sub-state within Autotuning state)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AutotunePhase {
+    /// Showing confirmation screen, waiting for user to confirm
+    #[default]
+    Confirming,
+    /// Autotune is running, showing progress
+    Running,
+    /// Autotune completed successfully, showing result
+    Complete,
+    /// Autotune failed, showing error
+    Failed,
+}
+
+/// Autotune failure reason for display
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutotuneFailureReason {
+    OverTemp,
+    Timeout,
+    SensorFault,
+    NoOscillation,
+    Cancelled,
+}
+
+impl AutotuneFailureReason {
+    /// Get a human-readable description
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::OverTemp => "Temperature exceeded limit",
+            Self::Timeout => "Autotune timed out",
+            Self::SensorFault => "Sensor fault detected",
+            Self::NoOscillation => "No oscillation detected",
+            Self::Cancelled => "Cancelled by user",
+        }
+    }
+}
+
 /// Controller state for coordinating subsystems
 pub struct Controller {
     /// Current machine state
@@ -32,10 +75,19 @@ pub struct Controller {
     profiles: Vec<ProfileConfig, MAX_PROFILES>,
     /// Available jars
     jars: Vec<JarConfig, MAX_JARS>,
-    /// Currently selected program index
+    /// Currently selected program index (AUTOTUNE_MENU_INDEX for autotune)
     selected_program: u8,
     /// Last tick timestamp (ms)
     last_tick_ms: u32,
+    /// Autotune UI phase
+    autotune_phase: AutotunePhase,
+    /// Autotune progress tracking
+    autotune_peaks: u8,
+    autotune_elapsed_ticks: u32,
+    /// Autotune result (when complete)
+    autotune_result: Option<(i16, i16, i16)>,
+    /// Autotune failure reason (when failed)
+    autotune_failure: Option<AutotuneFailureReason>,
 }
 
 impl Controller {
@@ -50,6 +102,11 @@ impl Controller {
             jars: Vec::new(),
             selected_program: 0,
             last_tick_ms: 0,
+            autotune_phase: AutotunePhase::default(),
+            autotune_peaks: 0,
+            autotune_elapsed_ticks: 0,
+            autotune_result: None,
+            autotune_failure: None,
         }
     }
 
@@ -139,10 +196,15 @@ impl Controller {
     fn handle_encoder_cw(&mut self) -> Option<Event> {
         match self.state {
             State::Idle => {
-                // Navigate program list
-                if !self.programs.is_empty() {
-                    self.selected_program =
-                        (self.selected_program + 1) % (self.programs.len() as u8);
+                // Navigate program list (programs + autotune item)
+                if self.selected_program == AUTOTUNE_MENU_INDEX {
+                    // Wrap from autotune to first program
+                    self.selected_program = 0;
+                } else if self.selected_program >= self.programs.len() as u8 - 1 {
+                    // Move to autotune
+                    self.selected_program = AUTOTUNE_MENU_INDEX;
+                } else {
+                    self.selected_program += 1;
                 }
                 None
             }
@@ -158,13 +220,17 @@ impl Controller {
     fn handle_encoder_ccw(&mut self) -> Option<Event> {
         match self.state {
             State::Idle => {
-                // Navigate program list backwards
-                if !self.programs.is_empty() {
-                    if self.selected_program == 0 {
+                // Navigate program list backwards (programs + autotune item)
+                if self.selected_program == AUTOTUNE_MENU_INDEX {
+                    // Move from autotune to last program
+                    if !self.programs.is_empty() {
                         self.selected_program = (self.programs.len() - 1) as u8;
-                    } else {
-                        self.selected_program -= 1;
                     }
+                } else if self.selected_program == 0 {
+                    // Wrap to autotune
+                    self.selected_program = AUTOTUNE_MENU_INDEX;
+                } else {
+                    self.selected_program -= 1;
                 }
                 None
             }
@@ -180,9 +246,21 @@ impl Controller {
     fn handle_button_click(&mut self) -> Option<Event> {
         match self.state {
             State::Idle => {
-                // Select program
-                self.transition(Event::SelectProgram);
-                Some(Event::SelectProgram)
+                if self.selected_program == AUTOTUNE_MENU_INDEX {
+                    // Show autotune confirmation screen
+                    self.autotune_phase = AutotunePhase::Confirming;
+                    self.autotune_peaks = 0;
+                    self.autotune_elapsed_ticks = 0;
+                    self.autotune_result = None;
+                    self.autotune_failure = None;
+                    self.transition(Event::StartAutotune);
+                    // Don't emit StartAutotune event yet - just show confirm screen
+                    None
+                } else {
+                    // Select program
+                    self.transition(Event::SelectProgram);
+                    Some(Event::SelectProgram)
+                }
             }
             State::ProgramSelected => {
                 // Start program
@@ -225,6 +303,33 @@ impl Controller {
                 self.transition(Event::AcknowledgeError);
                 Some(Event::AcknowledgeError)
             }
+            State::Autotuning => {
+                match self.autotune_phase {
+                    AutotunePhase::Confirming => {
+                        // User confirmed - actually start autotune
+                        self.autotune_phase = AutotunePhase::Running;
+                        Some(Event::StartAutotune)
+                    }
+                    AutotunePhase::Running => {
+                        // Still in progress - ignore click
+                        None
+                    }
+                    AutotunePhase::Complete => {
+                        // Dismiss result and go back to idle
+                        self.autotune_result = None;
+                        self.autotune_phase = AutotunePhase::Confirming;
+                        self.transition(Event::AutotuneComplete);
+                        Some(Event::AutotuneComplete)
+                    }
+                    AutotunePhase::Failed => {
+                        // Dismiss failure and go back to idle
+                        self.autotune_failure = None;
+                        self.autotune_phase = AutotunePhase::Confirming;
+                        self.transition(Event::AutotuneFailed);
+                        Some(Event::AutotuneFailed)
+                    }
+                }
+            }
             _ => None,
         }
     }
@@ -242,6 +347,30 @@ impl Controller {
                 // Back to idle
                 self.transition(Event::Back);
                 Some(Event::Back)
+            }
+            State::Autotuning => {
+                match self.autotune_phase {
+                    AutotunePhase::Confirming => {
+                        // Go back to idle without starting
+                        self.autotune_phase = AutotunePhase::Confirming;
+                        self.transition(Event::CancelAutotune);
+                        None // No event - didn't actually start
+                    }
+                    AutotunePhase::Running => {
+                        // Cancel running autotune
+                        self.autotune_failure = Some(AutotuneFailureReason::Cancelled);
+                        self.autotune_phase = AutotunePhase::Failed;
+                        Some(Event::CancelAutotune)
+                    }
+                    AutotunePhase::Complete | AutotunePhase::Failed => {
+                        // Already done - just dismiss
+                        self.autotune_result = None;
+                        self.autotune_failure = None;
+                        self.autotune_phase = AutotunePhase::Confirming;
+                        self.transition(Event::CancelAutotune);
+                        None
+                    }
+                }
             }
             _ => None,
         }
@@ -350,6 +479,61 @@ impl Controller {
     /// Get current temperature in whole degrees (if available)
     pub fn current_temp_c(&self) -> Option<i16> {
         self.safety.get_temperature()
+    }
+
+    // === Autotune methods ===
+
+    /// Check if autotune is selected in the menu
+    pub fn is_autotune_selected(&self) -> bool {
+        self.selected_program == AUTOTUNE_MENU_INDEX
+    }
+
+    /// Get the current autotune phase
+    pub fn autotune_phase(&self) -> AutotunePhase {
+        self.autotune_phase
+    }
+
+    /// Get the autotune target temperature in °C
+    pub fn autotune_target_c(&self) -> i16 {
+        AUTOTUNE_TARGET_X10 / 10
+    }
+
+    /// Get the autotune target temperature in °C × 10
+    pub fn autotune_target_x10(&self) -> i16 {
+        AUTOTUNE_TARGET_X10
+    }
+
+    /// Update autotune progress from heater task
+    pub fn update_autotune_progress(&mut self, peaks: u8, ticks: u32) {
+        self.autotune_peaks = peaks;
+        self.autotune_elapsed_ticks = ticks;
+    }
+
+    /// Set autotune result when complete (from heater task)
+    pub fn set_autotune_complete(&mut self, kp_x100: i16, ki_x100: i16, kd_x100: i16) {
+        self.autotune_result = Some((kp_x100, ki_x100, kd_x100));
+        self.autotune_phase = AutotunePhase::Complete;
+    }
+
+    /// Set autotune failure (from heater task)
+    pub fn set_autotune_failed(&mut self, reason: AutotuneFailureReason) {
+        self.autotune_failure = Some(reason);
+        self.autotune_phase = AutotunePhase::Failed;
+    }
+
+    /// Get autotune progress (peaks, elapsed ticks)
+    pub fn autotune_progress(&self) -> (u8, u32) {
+        (self.autotune_peaks, self.autotune_elapsed_ticks)
+    }
+
+    /// Get autotune result if available
+    pub fn autotune_result(&self) -> Option<(i16, i16, i16)> {
+        self.autotune_result
+    }
+
+    /// Get autotune failure reason if available
+    pub fn autotune_failure(&self) -> Option<AutotuneFailureReason> {
+        self.autotune_failure
     }
 }
 

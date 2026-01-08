@@ -130,7 +130,7 @@ pub enum HeaterControlMode {
     /// Simple on/off control with hysteresis
     #[default]
     BangBang,
-    /// PID control (future)
+    /// PID control with time-proportioning output
     Pid,
 }
 
@@ -147,6 +147,15 @@ pub struct HeaterConfig {
     pub max_temp: i16,
     /// Hysteresis for bang-bang control (°C)
     pub hysteresis: i16,
+    /// PID proportional gain (value × 100, e.g., 150 = 1.50)
+    ///
+    /// Only used when control mode is Pid. If None, uses calibration
+    /// values from flash or defaults.
+    pub pid_kp_x100: Option<i16>,
+    /// PID integral gain (value × 100, e.g., 10 = 0.10)
+    pub pid_ki_x100: Option<i16>,
+    /// PID derivative gain (value × 100, e.g., 50 = 0.50)
+    pub pid_kd_x100: Option<i16>,
 }
 
 /// UI configuration

@@ -11,8 +11,9 @@ use isochron_core::config::{JarConfig, MachineCapabilities, ProfileConfig, Progr
 use isochron_core::state::State;
 
 use crate::channels::{
-    EVENT_CHANNEL, HEARTBEAT_RECEIVED, HEATER_CMD, INPUT_CHANNEL, MOTOR_CMD, MOTOR_STALL,
-    SCREEN_UPDATE, TEMP_READING,
+    AutotuneCommand, AutotuneStatus, CalibrationSaveRequest, AUTOTUNE_CMD, AUTOTUNE_STATUS,
+    CALIBRATION_SAVE, EVENT_CHANNEL, HEARTBEAT_RECEIVED, HEATER_CMD, INPUT_CHANNEL, MOTOR_CMD,
+    MOTOR_STALL, SCREEN_UPDATE, TEMP_READING,
 };
 use crate::controller::Controller;
 use crate::display::Renderer;
@@ -66,6 +67,29 @@ pub async fn controller_task(
                     debug!("Event: {:?}", event);
                     // Log event for debugging
                     let _ = EVENT_CHANNEL.try_send(event);
+
+                    // Handle autotune start/cancel
+                    use crate::controller::AutotunePhase;
+                    use isochron_core::state::Event;
+                    match event {
+                        Event::StartAutotune => {
+                            // Only send command when actually starting (Running phase)
+                            if controller.autotune_phase() == AutotunePhase::Running {
+                                info!("Starting autotune");
+                                AUTOTUNE_CMD.signal(AutotuneCommand::Start {
+                                    target_x10: controller.autotune_target_x10(),
+                                });
+                            }
+                        }
+                        Event::CancelAutotune => {
+                            // Only send cancel if autotune was actually running
+                            if controller.autotune_phase() == AutotunePhase::Failed {
+                                info!("Canceling autotune");
+                                AUTOTUNE_CMD.signal(AutotuneCommand::Cancel);
+                            }
+                        }
+                        _ => {}
+                    }
                 }
 
                 // Update motor/heater commands
@@ -130,6 +154,62 @@ pub async fn controller_task(
                     HEARTBEAT_RECEIVED.reset();
                     controller.heartbeat_received();
                 }
+
+                // Check for autotune status updates
+                if let Some(status) = AUTOTUNE_STATUS.try_take() {
+                    use crate::channels::AutotuneFailure;
+                    use crate::controller::AutotuneFailureReason;
+
+                    match status {
+                        AutotuneStatus::Started => {
+                            info!("Autotune started");
+                        }
+                        AutotuneStatus::Progress { peaks, ticks } => {
+                            debug!("Autotune progress: {} peaks, {} ticks", peaks, ticks);
+                            controller.update_autotune_progress(peaks, ticks);
+                        }
+                        AutotuneStatus::Complete {
+                            kp_x100,
+                            ki_x100,
+                            kd_x100,
+                        } => {
+                            info!(
+                                "Autotune complete: Kp={}.{:02}, Ki={}.{:02}, Kd={}.{:02}",
+                                kp_x100 / 100,
+                                (kp_x100 % 100).abs(),
+                                ki_x100 / 100,
+                                (ki_x100 % 100).abs(),
+                                kd_x100 / 100,
+                                (kd_x100 % 100).abs(),
+                            );
+                            // Store result for display and set phase to Complete
+                            controller.set_autotune_complete(kp_x100, ki_x100, kd_x100);
+                            // Request calibration save to flash
+                            CALIBRATION_SAVE.signal(CalibrationSaveRequest {
+                                heater_index: 0,
+                                kp_x100,
+                                ki_x100,
+                                kd_x100,
+                            });
+                        }
+                        AutotuneStatus::Failed(reason) => {
+                            warn!("Autotune failed: {:?}", reason);
+                            // Convert channel failure type to controller failure type
+                            let failure_reason = match reason {
+                                AutotuneFailure::OverTemp => AutotuneFailureReason::OverTemp,
+                                AutotuneFailure::Timeout => AutotuneFailureReason::Timeout,
+                                AutotuneFailure::SensorFault => AutotuneFailureReason::SensorFault,
+                                AutotuneFailure::NoOscillation => {
+                                    AutotuneFailureReason::NoOscillation
+                                }
+                                AutotuneFailure::Cancelled => AutotuneFailureReason::Cancelled,
+                            };
+                            controller.set_autotune_failed(failure_reason);
+                        }
+                    }
+                    // Re-render display for autotune status changes
+                    render_current_state(&controller, &mut renderer).await;
+                }
             }
         }
     }
@@ -142,9 +222,17 @@ async fn render_current_state(controller: &Controller, renderer: &mut Renderer) 
             renderer.render_boot();
         }
         State::Idle => {
-            // Collect program labels
-            let labels: heapless::Vec<&str, 8> = controller.program_labels().take(8).collect();
-            renderer.render_menu(&labels, controller.selected_program() as usize);
+            // Collect program labels plus autotune option
+            let mut labels: heapless::Vec<&str, 8> = controller.program_labels().take(7).collect();
+            let _ = labels.push("Autotune Heater");
+
+            // Determine selected index for display
+            let selected = if controller.is_autotune_selected() {
+                labels.len() - 1 // Last item (autotune)
+            } else {
+                controller.selected_program() as usize
+            };
+            renderer.render_menu(&labels, selected);
         }
         State::ProgramSelected => {
             if let Some(program) = controller.get_program(controller.selected_program()) {
@@ -234,6 +322,38 @@ async fn render_current_state(controller: &Controller, renderer: &mut Renderer) 
         }
         State::EditProgram => {
             // Placeholder for edit mode
+        }
+        State::Autotuning => {
+            use crate::controller::AutotunePhase;
+            match controller.autotune_phase() {
+                AutotunePhase::Confirming => {
+                    // Show confirmation screen
+                    renderer.render_autotune_confirm(controller.autotune_target_c());
+                }
+                AutotunePhase::Running => {
+                    // Show progress screen
+                    let (peaks, ticks) = controller.autotune_progress();
+                    // Convert ticks to seconds (500ms per tick)
+                    let elapsed_s = (ticks / 2) as u32;
+                    let temp_c = controller.current_temp_c().unwrap_or(0);
+                    let target_c = controller.autotune_target_c();
+                    renderer.render_autotune_progress(peaks, elapsed_s, temp_c, target_c);
+                }
+                AutotunePhase::Complete => {
+                    // Show result screen
+                    if let Some((kp, ki, kd)) = controller.autotune_result() {
+                        renderer.render_autotune_complete(kp, ki, kd);
+                    }
+                }
+                AutotunePhase::Failed => {
+                    // Show failure screen
+                    let reason = controller
+                        .autotune_failure()
+                        .map(|r| r.as_str())
+                        .unwrap_or("Unknown error");
+                    renderer.render_autotune_failed(reason);
+                }
+            }
         }
     }
 

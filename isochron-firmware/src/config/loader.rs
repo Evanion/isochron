@@ -56,6 +56,14 @@ impl<'d> ConfigPersistence<'d> {
         Self { storage }
     }
 
+    /// Consume this persistence manager and return the underlying storage
+    ///
+    /// Use this to reclaim the FlashStorage after loading config, so it can
+    /// be passed to other tasks (e.g., calibration persistence).
+    pub fn into_storage(self) -> FlashStorage<'d> {
+        self.storage
+    }
+
     /// Load configuration from flash
     ///
     /// Tries to load TOML config first, falls back to binary postcard format.

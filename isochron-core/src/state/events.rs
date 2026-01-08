@@ -52,6 +52,16 @@ pub enum Event {
     /// Prompt user to move to next jar
     PromptNextJar,
 
+    // PID autotune events
+    /// User started PID autotune
+    StartAutotune,
+    /// Autotune completed successfully with new coefficients
+    AutotuneComplete,
+    /// Autotune failed (timeout, over-temp, sensor fault, etc.)
+    AutotuneFailed,
+    /// User cancelled autotune
+    CancelAutotune,
+
     // Safety events
     /// Error detected by safety subsystem
     ErrorDetected(ErrorKind),
@@ -74,6 +84,8 @@ impl Event {
                 | Event::Abort
                 | Event::UserConfirm
                 | Event::AcknowledgeError
+                | Event::StartAutotune
+                | Event::CancelAutotune
         )
     }
 

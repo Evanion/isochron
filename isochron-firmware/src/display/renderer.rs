@@ -347,6 +347,101 @@ impl Renderer {
 
         self.screen.set_line(7, "CLICK when ready");
     }
+
+    /// Render autotune confirmation screen
+    ///
+    /// Shows target temperature and asks for confirmation.
+    pub fn render_autotune_confirm(&mut self, target_c: i16) {
+        self.screen.clear();
+        self.screen.set_line(0, "=== HEATER AUTOTUNE ==");
+        self.screen.set_line(2, "This will calibrate");
+        self.screen.set_line(3, "PID coefficients.");
+
+        let mut temp_line: String<22> = String::new();
+        let _ = write_to_string(&mut temp_line, format_args!("Target: {}C", target_c));
+        self.screen.set_line(5, &temp_line);
+
+        self.screen.set_line(7, "CLICK=Start HOLD=Back");
+    }
+
+    /// Render autotune progress screen
+    ///
+    /// Shows oscillation count and elapsed time.
+    pub fn render_autotune_progress(
+        &mut self,
+        peaks: u8,
+        elapsed_s: u32,
+        temp_c: i16,
+        target_c: i16,
+    ) {
+        self.screen.clear();
+        self.screen.set_line(0, "  AUTOTUNING...");
+
+        let mut temp_line: String<22> = String::new();
+        let _ = write_to_string(
+            &mut temp_line,
+            format_args!("Temp: {}C / {}C", temp_c, target_c),
+        );
+        self.screen.set_line(2, &temp_line);
+
+        let mut peaks_line: String<22> = String::new();
+        let _ = write_to_string(
+            &mut peaks_line,
+            format_args!("Oscillations: {}/12", peaks / 2),
+        );
+        self.screen.set_line(4, &peaks_line);
+
+        let mins = elapsed_s / 60;
+        let secs = elapsed_s % 60;
+        let mut time_line: String<22> = String::new();
+        let _ = write_to_string(
+            &mut time_line,
+            format_args!("Elapsed: {}:{:02}", mins, secs),
+        );
+        self.screen.set_line(5, &time_line);
+
+        self.screen.set_line(7, "HOLD to cancel");
+    }
+
+    /// Render autotune complete screen
+    ///
+    /// Shows calculated PID coefficients.
+    pub fn render_autotune_complete(&mut self, kp_x100: i16, ki_x100: i16, kd_x100: i16) {
+        self.screen.clear();
+        self.screen.set_line(0, " AUTOTUNE COMPLETE");
+
+        let mut kp_line: String<22> = String::new();
+        let _ = write_to_string(
+            &mut kp_line,
+            format_args!("Kp: {}.{:02}", kp_x100 / 100, (kp_x100 % 100).abs()),
+        );
+        self.screen.set_line(2, &kp_line);
+
+        let mut ki_line: String<22> = String::new();
+        let _ = write_to_string(
+            &mut ki_line,
+            format_args!("Ki: {}.{:02}", ki_x100 / 100, (ki_x100 % 100).abs()),
+        );
+        self.screen.set_line(3, &ki_line);
+
+        let mut kd_line: String<22> = String::new();
+        let _ = write_to_string(
+            &mut kd_line,
+            format_args!("Kd: {}.{:02}", kd_x100 / 100, (kd_x100 % 100).abs()),
+        );
+        self.screen.set_line(4, &kd_line);
+
+        self.screen.set_line(6, "Coefficients saved!");
+        self.screen.set_line(7, "CLICK to continue");
+    }
+
+    /// Render autotune failed screen
+    pub fn render_autotune_failed(&mut self, reason: &str) {
+        self.screen.clear();
+        self.screen.set_line(0, "  AUTOTUNE FAILED");
+        self.screen.set_line(3, reason);
+        self.screen.set_line(7, "CLICK to continue");
+    }
 }
 
 impl Default for Renderer {

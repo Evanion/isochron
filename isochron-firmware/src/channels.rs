@@ -44,3 +44,71 @@ pub static TEMP_READING: Signal<CriticalSectionRawMutex, Option<i16>> = Signal::
 /// Motor stall signal (updated by TMC monitoring task)
 /// True if motor stall detected via StallGuard
 pub static MOTOR_STALL: Signal<CriticalSectionRawMutex, bool> = Signal::new();
+
+/// Autotune command types
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum AutotuneCommand {
+    /// Start autotune with target temperature (°C × 10)
+    Start { target_x10: i16 },
+    /// Cancel ongoing autotune
+    Cancel,
+}
+
+/// Autotune status updates
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum AutotuneStatus {
+    /// Autotune started
+    Started,
+    /// Progress update (peak count, elapsed ticks)
+    Progress { peaks: u8, ticks: u32 },
+    /// Autotune completed with coefficients (×100)
+    Complete {
+        kp_x100: i16,
+        ki_x100: i16,
+        kd_x100: i16,
+    },
+    /// Autotune failed
+    Failed(AutotuneFailure),
+}
+
+/// Autotune failure reasons
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum AutotuneFailure {
+    /// Over temperature
+    OverTemp,
+    /// Timeout
+    Timeout,
+    /// Sensor fault
+    SensorFault,
+    /// Oscillation too small
+    NoOscillation,
+    /// User cancelled
+    Cancelled,
+}
+
+/// Autotune command signal (from controller to heater task)
+pub static AUTOTUNE_CMD: Signal<CriticalSectionRawMutex, AutotuneCommand> = Signal::new();
+
+/// Autotune status signal (from heater task to controller)
+pub static AUTOTUNE_STATUS: Signal<CriticalSectionRawMutex, AutotuneStatus> = Signal::new();
+
+/// Calibration save request
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct CalibrationSaveRequest {
+    /// Heater index
+    pub heater_index: u8,
+    /// Proportional gain (×100)
+    pub kp_x100: i16,
+    /// Integral gain (×100)
+    pub ki_x100: i16,
+    /// Derivative gain (×100)
+    pub kd_x100: i16,
+}
+
+/// Calibration save request signal (from controller to calibration task)
+pub static CALIBRATION_SAVE: Signal<CriticalSectionRawMutex, CalibrationSaveRequest> =
+    Signal::new();
