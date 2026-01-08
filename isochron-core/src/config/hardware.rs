@@ -304,6 +304,18 @@ pub struct MachineConfig {
     pub version: u8,
     /// Motor type for this machine
     pub motor_type: MotorType,
+
+    // === Motion Safety ===
+
+    /// Safe Z position for horizontal travel (mm)
+    /// The basket lifts to this height before moving between jars.
+    /// Should be high enough to clear jar rims and any obstructions.
+    /// Typically near stepper.z position_min (top of travel).
+    /// If not specified, defaults to stepper.z position_min.
+    pub safe_z: Option<i32>,
+
+    // === Hardware ===
+
     /// Stepper motor configurations (when motor_type = Stepper)
     pub steppers: Vec<StepperHwConfig, MAX_STEPPERS>,
     /// TMC2209 driver configurations (when motor_type = Stepper)
@@ -333,6 +345,7 @@ impl Default for MachineConfig {
         Self {
             version: 1,
             motor_type: MotorType::default(),
+            safe_z: None,
             steppers: Vec::new(),
             tmc2209s: Vec::new(),
             dc_motors: Vec::new(),

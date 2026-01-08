@@ -13,6 +13,12 @@
 [machine]
 version = 1
 
+# Safe Z position for horizontal travel between jars (mm)
+# The basket lifts to this height before moving to the next jar.
+# Should be high enough to clear jar rims and any obstructions.
+# Typically near position_min (top) for a top-homing Z axis.
+# safe_z = 5
+
 # =============================================================================
 # STEPPERS
 # =============================================================================

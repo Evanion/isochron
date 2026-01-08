@@ -91,6 +91,7 @@ fn validate_config() {
     validate_required_sections(&config);
 
     // Validate section contents
+    validate_machine_section(&config);
     validate_profiles(&config);
     validate_programs(&config);
     validate_jars(&config);
@@ -137,6 +138,62 @@ fn validate_required_sections(config: &toml::Value) {
             "\n\
             ╔══════════════════════════════════════════════════════════════════╗\n\
             ║  ERROR: Missing required sections in machine.toml                ║\n\
+            ╠══════════════════════════════════════════════════════════════════╣\n\
+            {}\n\
+            ╚══════════════════════════════════════════════════════════════════╝\n",
+            errors
+                .iter()
+                .map(|e| format!("║  • {:<62} ║", e))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+    }
+}
+
+/// Validate [machine] section
+fn validate_machine_section(config: &toml::Value) {
+    let machine = match config.get("machine") {
+        Some(toml::Value::Table(t)) => t,
+        _ => return,
+    };
+
+    let mut errors = Vec::new();
+
+    // Validate safe_z against z stepper limits (if z stepper is configured)
+    if let Some(toml::Value::Integer(safe_z)) = machine.get("safe_z") {
+        // Get z stepper position limits
+        if let Some(z_stepper) = config
+            .get("stepper")
+            .and_then(|s| s.get("z"))
+            .and_then(|s| s.as_table())
+        {
+            let z_min = z_stepper
+                .get("position_min")
+                .and_then(|v| v.as_integer())
+                .unwrap_or(0);
+
+            if let Some(z_max) = z_stepper.get("position_max").and_then(|v| v.as_integer()) {
+                if *safe_z < z_min {
+                    errors.push(format!(
+                        "safe_z ({}) is below stepper.z position_min ({})",
+                        safe_z, z_min
+                    ));
+                }
+                if *safe_z > z_max {
+                    errors.push(format!(
+                        "safe_z ({}) is above stepper.z position_max ({})",
+                        safe_z, z_max
+                    ));
+                }
+            }
+        }
+    }
+
+    if !errors.is_empty() {
+        panic!(
+            "\n\
+            ╔══════════════════════════════════════════════════════════════════╗\n\
+            ║  ERROR: Invalid machine configuration                            ║\n\
             ╠══════════════════════════════════════════════════════════════════╣\n\
             {}\n\
             ╚══════════════════════════════════════════════════════════════════╝\n",

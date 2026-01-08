@@ -6,11 +6,45 @@ This document describes the available configuration sections and parameters for 
 
 Isochron uses a hierarchical configuration with these main sections:
 
+- **Machine section**: `[machine]` - global settings
 - **Hardware sections**: `[stepper]`, `[tmc2209]`, `[heater]`, `[display]`
 - **Machine sections**: `[jar]`, `[profile]`, `[program]`
 - **UI sections**: `[ui]`
 
 Parameters shown with `#` prefix are optional with default values. Parameters without `#` are required.
+
+---
+
+## Machine Configuration
+
+### [machine]
+
+Global machine settings.
+
+```toml
+[machine]
+version = 1
+#   Configuration version. Must be 1 for current firmware.
+#   Used for future backwards compatibility.
+
+#safe_z = 5
+#   Safe Z position for horizontal travel between jars (mm).
+#   The basket lifts to this height before moving to the next jar.
+#   Should be high enough to clear jar rims and any obstructions.
+#   Typically near stepper.z position_min (top of travel).
+#   If not specified, defaults to stepper.z position_min.
+#   Only used on automated machines with z stepper.
+```
+
+#### Transfer Sequence
+
+When moving between jars on automated machines, the firmware executes:
+
+1. **Lift**: Move Z to `safe_z` position (clears jar rim)
+2. **Travel**: Move X to target jar's `x_pos`
+3. **Lower**: Move Z to target jar's `z_pos`
+
+This prevents collisions with jar rims during horizontal travel.
 
 ---
 
