@@ -1,0 +1,56 @@
+# Raspberry Pi Pico Board Configuration
+#
+# Pin mappings for standard Raspberry Pi Pico.
+# Requires external stepper drivers connected via jumper wires.
+
+[board]
+name = "Raspberry Pi Pico"
+mcu = "rp2040"
+flash_size = 2097152  # 2MB
+
+# Stepper motor pins (directly on board)
+# Configure based on your wiring
+[stepper.x]
+step = "gpio2"
+dir = "gpio3"
+enable = "!gpio4"  # Active low
+
+# Additional steppers can be added as needed
+# [stepper.y]
+# step = "gpio5"
+# dir = "gpio6"
+# enable = "!gpio7"
+
+# Heater outputs
+[heaters]
+heater0 = "gpio15"
+
+# Temperature sensors (ADC)
+[thermistors]
+th0 = "gpio26"  # ADC0
+th1 = "gpio27"  # ADC1
+
+# Fan outputs
+[fans]
+fan0 = "gpio14"  # PWM capable
+
+# Communication
+[uart]
+# UART0 for display communication
+display_tx = "gpio0"
+display_rx = "gpio1"
+display_baud = 250000
+
+# I2C for direct OLED connection
+[i2c]
+sda = "gpio16"
+scl = "gpio17"
+frequency = 400000
+
+# Endstops / sensors
+[endstops]
+# Configure based on your wiring
+
+# USB
+[usb]
+enabled = true

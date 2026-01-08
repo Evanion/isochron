@@ -1,0 +1,55 @@
+[package]
+name = "isochron-display-fw"
+version = "0.1.0"
+edition = "2021"
+description = "Display firmware for Isochron watch cleaner (V0 Mini OLED)"
+license = "GPL-3.0-or-later"
+
+[[bin]]
+name = "isochron-display-fw"
+path = "src/main.rs"
+
+[features]
+default = ["defmt"]
+defmt = [
+    "dep:defmt",
+    "dep:defmt-rtt",
+    "embassy-stm32/defmt",
+    "embassy-executor/defmt",
+    "embassy-time/defmt",
+    "embassy-sync/defmt",
+    "isochron-hal/defmt",
+    "isochron-protocol/defmt",
+]
+
+[dependencies]
+# Local crates
+isochron-hal = { path = "../../hal/isochron-hal" }
+isochron-hal-stm32f0 = { path = "../../hal/isochron-hal-stm32f0" }
+isochron-display = { path = "../isochron-display" }
+isochron-protocol = { path = "../../isochron-protocol" }
+
+# Embassy - workspace versions
+embassy-executor = { workspace = true, features = ["arch-cortex-m", "executor-thread"] }
+embassy-time.workspace = true
+embassy-sync.workspace = true
+embassy-stm32 = { workspace = true, features = ["stm32f042k6", "time-driver-any", "exti"] }
+embassy-futures.workspace = true
+
+# Embedded
+cortex-m.workspace = true
+cortex-m-rt.workspace = true
+embedded-hal.workspace = true
+embedded-hal-async.workspace = true
+embedded-io.workspace = true
+embedded-io-async.workspace = true
+
+# Graphics
+embedded-graphics = "0.8"
+
+# Utilities
+heapless.workspace = true
+portable-atomic = { version = "1", features = ["critical-section"] }
+defmt = { workspace = true, optional = true }
+defmt-rtt = { version = "0.4", optional = true }
+panic-probe = { workspace = true, features = ["print-defmt"] }

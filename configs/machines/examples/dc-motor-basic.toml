@@ -1,0 +1,138 @@
+# Isochron Watch Cleaner - DC Motor Configuration
+#
+# Example configuration for machines using DC motors.
+# Simpler and more affordable than stepper-based builds.
+
+[machine]
+version = 1
+motor_type = "dc"  # dc, ac, or stepper
+
+# =============================================================================
+# DC MOTORS
+# =============================================================================
+# DC motors are controlled via PWM through H-bridge or MOSFET drivers.
+# Each motor has enable (on/off), direction (for H-bridge), and PWM (speed).
+
+[dc_motor.spin]
+pwm_pin = "gpio11"           # PWM speed control
+dir_pin = "gpio10"           # Direction (for H-bridge)
+enable_pin = "!gpio12"       # Enable (active low)
+driver_type = "h_bridge"     # h_bridge, mosfet, or dual_mosfet
+pwm_frequency = 25000        # Hz
+min_duty = 20                # % minimum for motor to start
+soft_start_ms = 500          # ms to ramp up
+soft_stop_ms = 300           # ms to ramp down
+
+[dc_motor.lift]
+pwm_pin = "gpio6"
+dir_pin = "gpio5"
+enable_pin = "!gpio7"
+driver_type = "h_bridge"
+pwm_frequency = 25000
+min_duty = 30
+soft_start_ms = 200
+soft_stop_ms = 200
+# Limit switches for safety
+endstop_up = "^gpio4"
+endstop_down = "^gpio3"
+
+[dc_motor.tower]
+pwm_pin = "gpio19"
+dir_pin = "gpio28"
+enable_pin = "!gpio2"
+driver_type = "h_bridge"
+pwm_frequency = 25000
+min_duty = 25
+soft_start_ms = 300
+soft_stop_ms = 300
+endstop_home = "^gpio16"
+
+# =============================================================================
+# HEATERS (same as stepper config)
+# =============================================================================
+
+[heater.dryer]
+heater_pin = "gpio23"
+sensor_pin = "gpio27"
+sensor_type = "ntc100k"
+control = "bang_bang"
+max_temp = 55
+hysteresis = 2
+
+# =============================================================================
+# JARS (same as stepper config)
+# =============================================================================
+
+[jar.clean]
+tower_pos = 0
+lift_pos = 120
+
+[jar.rinse1]
+tower_pos = 90
+lift_pos = 120
+
+[jar.rinse2]
+tower_pos = 180
+lift_pos = 120
+
+[jar.dry]
+tower_pos = 270
+lift_pos = 100
+heater = "dryer"
+
+# =============================================================================
+# PROFILES (DC motor version)
+# =============================================================================
+# Note: DC motors use percentage speed (0-100) instead of RPM
+
+[profile.clean]
+label = "Clean"
+speed = 80                   # % of max speed
+time_s = 180
+direction = "alternate"
+iterations = 3
+
+[profile.rinse]
+label = "Rinse"
+speed = 70
+time_s = 120
+direction = "cw"
+iterations = 1
+
+[profile.dry]
+label = "Dry"
+speed = 50
+time_s = 600
+direction = "alternate"
+iterations = 6
+temperature_c = 45
+
+# =============================================================================
+# PROGRAMS (same as stepper config)
+# =============================================================================
+
+[program.full_clean]
+label = "Full Clean"
+steps = [
+    { jar = "clean", profile = "clean" },
+    { jar = "rinse1", profile = "rinse" },
+    { jar = "rinse2", profile = "rinse" },
+    { jar = "dry", profile = "dry" },
+]
+
+[program.quick_clean]
+label = "Quick Clean"
+steps = [
+    { jar = "clean", profile = "clean" },
+    { jar = "rinse1", profile = "rinse" },
+]
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+
+[display]
+type = "direct_oled"         # I2C OLED on controller
+i2c_sda = "gpio0"
+i2c_scl = "gpio1"
+address = 0x3C

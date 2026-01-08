@@ -21,7 +21,7 @@ defmt = [
 # Workspace crates
 isochron-core = { path = "../isochron-core", features = ["serde"] }
 isochron-drivers = { path = "../isochron-drivers" }
-isochron-hal-rp2040 = { path = "../isochron-hal-rp2040" }
+isochron-hal-rp2040 = { path = "../hal/isochron-hal-rp2040" }
 isochron-protocol = { path = "../isochron-protocol" }
 
 # Embassy

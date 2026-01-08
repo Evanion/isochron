@@ -8,20 +8,38 @@
 [workspace]
 resolver = "2"
 members = [
+    # HALs
+    "hal/isochron-hal",
+    "hal/isochron-hal-rp2040",
+    "hal/isochron-hal-stm32f0",
+    # Display
+    "displays/isochron-display",
+    "displays/isochron-display-fw",
+    # Core crates
     "isochron-core",
     "isochron-drivers",
-    "isochron-hal-rp2040",
     "isochron-protocol",
     "isochron-firmware",
 ]
 
+# Default members for `cargo check/test` - excludes firmware (requires specific target)
+# Use `make build` or `cargo build -p isochron-firmware` for firmware builds
+default-members = [
+    "hal/isochron-hal",
+    "isochron-core",
+    "isochron-drivers",
+    "isochron-protocol",
+    "displays/isochron-display",
+]
+
 # Shared dependencies with consistent versions across workspace
 [workspace.dependencies]
-# Async runtime (use git for latest embassy)
+# Async runtime - using current versions
 embassy-executor = { version = "0.9", features = ["arch-cortex-m", "executor-thread", "defmt"] }
-embassy-time = { version = "0.4", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-time = { version = "0.5", features = ["defmt", "defmt-timestamp-uptime"] }
 embassy-sync = { version = "0.7", features = ["defmt"] }
-embassy-rp = { version = "0.4", features = ["defmt", "time-driver", "critical-section-impl", "rp2040", "unstable-pac"] }
+embassy-rp = { version = "0.9", features = ["defmt", "time-driver", "critical-section-impl", "rp2040"] }
+embassy-stm32 = { version = "0.5", features = ["defmt", "time-driver-any"] }
 embassy-futures = "0.1"
 
 # Embedded fundamentals

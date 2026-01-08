@@ -4,7 +4,6 @@
 //! Uses UART1 on GPIO8 (TX) and GPIO9 (RX) for TMC communication.
 
 use defmt::*;
-use embassy_rp::peripherals::UART1;
 use embassy_rp::uart::{Async, UartTx};
 use embassy_time::{Duration, Timer};
 
@@ -16,7 +15,7 @@ use isochron_drivers::stepper::tmc2209::{Tmc2209Config, Tmc2209Driver};
 /// After initialization, the driver is configured for StealthChop operation
 /// with the specified current settings.
 #[embassy_executor::task]
-pub async fn tmc_init_task(mut tx: UartTx<'static, UART1, Async>, config: Tmc2209Config) {
+pub async fn tmc_init_task(mut tx: UartTx<'static, Async>, config: Tmc2209Config) {
     info!("TMC2209 init task starting...");
 
     // Wait for TMC2209 to power up

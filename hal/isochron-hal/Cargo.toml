@@ -1,0 +1,18 @@
+[package]
+name = "isochron-hal"
+version = "0.1.0"
+edition = "2021"
+description = "Hardware abstraction traits for Isochron firmware"
+license = "GPL-3.0-or-later"
+authors = ["Isochron Contributors"]
+repository = "https://github.com/Evanion/isochron"
+
+[features]
+default = []
+defmt = ["dep:defmt"]
+# Enable sequential-storage Key trait implementation for StorageKey
+sequential-storage = ["dep:sequential-storage"]
+
+[dependencies]
+defmt = { version = "0.3", optional = true }
+sequential-storage = { version = "4.0", default-features = false, optional = true }

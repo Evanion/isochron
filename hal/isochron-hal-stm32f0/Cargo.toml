@@ -1,0 +1,36 @@
+[package]
+name = "isochron-hal-stm32f0"
+version = "0.1.0"
+edition = "2021"
+description = "STM32F0-specific HAL for Isochron firmware (V0 display and similar boards)"
+license = "GPL-3.0-or-later"
+
+[features]
+default = []
+defmt = ["dep:defmt", "embassy-stm32/defmt", "isochron-hal/defmt"]
+# Chip variants - select one via final firmware
+stm32f042f6 = ["embassy-stm32/stm32f042f6"]
+stm32f042k6 = ["embassy-stm32/stm32f042k6"]
+
+[dependencies]
+isochron-hal = { path = "../isochron-hal" }
+isochron-protocol = { path = "../../isochron-protocol" }
+
+# Embassy - use workspace versions
+embassy-executor.workspace = true
+embassy-time.workspace = true
+embassy-sync.workspace = true
+embassy-stm32.workspace = true
+embassy-futures.workspace = true
+
+# Embedded
+cortex-m.workspace = true
+cortex-m-rt.workspace = true
+embedded-hal.workspace = true
+embedded-hal-async.workspace = true
+embedded-io.workspace = true
+embedded-io-async.workspace = true
+
+# Utilities
+heapless.workspace = true
+defmt = { workspace = true, optional = true }

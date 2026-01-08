@@ -93,7 +93,63 @@ impl<'a> PicoMessage<'a> {
     }
 }
 
-/// Commands parsed from display-originated frames
+/// Commands parsed from controller-originated frames (received by display)
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ControllerCommand {
+    /// Heartbeat request
+    Ping,
+    /// Clear the entire screen
+    ClearScreen,
+    /// Draw text at a position
+    Text { row: u8, col: u8, text: heapless::String<21> },
+    /// Invert a region (for selection highlight)
+    Invert { row: u8, start_col: u8, end_col: u8 },
+    /// Reset display to boot state
+    Reset,
+}
+
+impl ControllerCommand {
+    /// Parse a command from a frame
+    pub fn from_frame(frame: &Frame) -> Result<Self, FrameError> {
+        match frame.msg_type {
+            MSG_PING => Ok(ControllerCommand::Ping),
+            MSG_PONG => Ok(ControllerCommand::Ping), // Treat PONG as PING for display
+            MSG_CLEAR => Ok(ControllerCommand::ClearScreen),
+            MSG_TEXT => {
+                if frame.payload.len() < 3 {
+                    return Err(FrameError::InvalidFrame);
+                }
+                let row = frame.payload[0];
+                let col = frame.payload[1];
+                let len = frame.payload[2] as usize;
+                if frame.payload.len() < 3 + len {
+                    return Err(FrameError::InvalidFrame);
+                }
+                let text_bytes = &frame.payload[3..3 + len];
+                let text = core::str::from_utf8(text_bytes)
+                    .map_err(|_| FrameError::InvalidFrame)?;
+                let mut s = heapless::String::new();
+                s.push_str(text).map_err(|_| FrameError::InvalidFrame)?;
+                Ok(ControllerCommand::Text { row, col, text: s })
+            }
+            MSG_INVERT => {
+                if frame.payload.len() < 3 {
+                    return Err(FrameError::InvalidFrame);
+                }
+                Ok(ControllerCommand::Invert {
+                    row: frame.payload[0],
+                    start_col: frame.payload[1],
+                    end_col: frame.payload[2],
+                })
+            }
+            MSG_RESET => Ok(ControllerCommand::Reset),
+            _ => Err(FrameError::InvalidFrame),
+        }
+    }
+}
+
+/// Commands parsed from display-originated frames (received by controller)
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DisplayCommand {

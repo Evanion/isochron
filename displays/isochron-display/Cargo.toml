@@ -1,0 +1,18 @@
+[package]
+name = "isochron-display"
+version = "0.1.0"
+edition = "2021"
+description = "Display abstraction traits and shared renderer for Isochron firmware"
+license = "GPL-3.0-or-later"
+
+[features]
+default = []
+defmt = ["dep:defmt"]
+
+[dependencies]
+# Protocol for display communication
+isochron-protocol = { path = "../../isochron-protocol" }
+
+# Utilities
+heapless = { version = "0.8" }
+defmt = { version = "0.3", optional = true }

@@ -1,6 +1,10 @@
 # Build artifacts
 /target/
+/out/
 **/*.uf2
+
+# Build configuration (user-specific)
+/.config
 
 # OS files
 .DS_Store

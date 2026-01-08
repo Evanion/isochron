@@ -4,7 +4,6 @@
 
 use defmt::*;
 use embassy_rp::uart::BufferedUartRx;
-use embassy_rp::peripherals::UART0;
 use embedded_io_async::Read;
 
 use isochron_protocol::{DisplayCommand, FrameParser};
@@ -16,7 +15,7 @@ const RX_BUF_SIZE: usize = 64;
 
 /// Display RX task - receives and parses frames from V0 Display
 #[embassy_executor::task]
-pub async fn display_rx_task(mut rx: BufferedUartRx<'static, UART0>) {
+pub async fn display_rx_task(mut rx: BufferedUartRx) {
     info!("Display RX task started");
 
     let mut parser = FrameParser::new();

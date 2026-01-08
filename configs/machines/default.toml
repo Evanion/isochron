@@ -1,0 +1,222 @@
+# Isochron Watch Cleaner - Machine Configuration
+#
+# This file is embedded into the firmware at build time.
+# Edit this file and rebuild to customize your machine.
+#
+# Pin format:
+#   gpio11     - GPIO pin 11
+#   !gpio12    - GPIO pin 12, active low (inverted)
+#   ^gpio4     - GPIO pin 4 with pull-up resistor
+#
+# For SKR Pico pinout, see docs/Boards.md
+
+[machine]
+version = 1
+
+# =============================================================================
+# STEPPERS
+# =============================================================================
+
+# Basket spin motor (rotates parts in solution) - always required
+[stepper.spin]
+step_pin = "gpio11"
+dir_pin = "gpio10"
+enable_pin = "!gpio12"
+rotation_distance = 360             # degrees per motor rotation
+gear_ratio = "3:1"                  # 3:1 belt reduction
+full_steps_per_rotation = 200       # 1.8 degree motor
+microsteps = 16
+
+# TMC2209 driver configuration for spin motor
+[tmc2209.spin]
+uart_address = 0
+run_current = 800                   # mA
+hold_current = 400                  # mA (optional, defaults to 50% of run)
+stealthchop = true
+stallguard_threshold = 80
+
+# Lift motor (raises/lowers basket) - optional for automated machines
+# Uncomment to enable:
+#
+# [stepper.lift]
+# step_pin = "gpio6"
+# dir_pin = "gpio5"
+# enable_pin = "!gpio7"
+# rotation_distance = 8             # mm per leadscrew rotation
+# full_steps_per_rotation = 200
+# microsteps = 16
+# endstop_pin = "^gpio4"            # physical endstop with pull-up
+# position_endstop = 0              # mm at endstop
+# position_max = 150                # mm max travel
+# homing_speed = 10                 # mm/s
+#
+# [tmc2209.lift]
+# uart_address = 1
+# run_current = 800
+# stealthchop = true
+# stallguard_threshold = 60
+
+# Tower/position motor (rotates between jars) - optional for automated machines
+# Uncomment to enable:
+#
+# [stepper.tower]
+# step_pin = "gpio19"
+# dir_pin = "gpio28"
+# enable_pin = "!gpio2"
+# rotation_distance = 360           # degrees per motor rotation
+# gear_ratio = "5:1"
+# microsteps = 16
+# endstop_pin = "^gpio16"           # home switch
+# position_endstop = 0              # degrees at home
+# position_max = 360                # degrees (full rotation)
+# homing_speed = 30                 # deg/s
+#
+# [tmc2209.tower]
+# uart_address = 2
+# run_current = 600
+# stealthchop = true
+# stallguard_threshold = 60
+
+# =============================================================================
+# HEATERS
+# =============================================================================
+
+[heater.dryer]
+heater_pin = "gpio23"
+sensor_pin = "gpio27"
+sensor_type = "ntc100k"
+control = "bang_bang"
+max_temp = 55
+hysteresis = 2
+
+# Additional heater example (per-jar heating):
+#
+# [heater.clean_jar]
+# heater_pin = "gpio21"
+# sensor_pin = "gpio26"
+# sensor_type = "ntc100k"
+# control = "bang_bang"
+# max_temp = 40
+# hysteresis = 2
+
+# =============================================================================
+# JARS
+# =============================================================================
+# Define physical jar positions for automated machines.
+# For manual machines, these define the jar sequence only.
+#
+# tower_pos: degrees from home (for tower rotation)
+# lift_pos: mm down from top (for lift motor)
+# heater: optional heater name to use for this jar
+
+[jar.clean]
+tower_pos = 0
+lift_pos = 120
+
+[jar.rinse1]
+tower_pos = 90
+lift_pos = 120
+
+[jar.rinse2]
+tower_pos = 180
+lift_pos = 120
+
+[jar.dry]
+tower_pos = 270
+lift_pos = 100
+heater = "dryer"
+
+# =============================================================================
+# PROFILES
+# =============================================================================
+# Cleaning profiles define how the basket behaves in each jar.
+#
+# direction: "cw" (clockwise), "ccw" (counter-clockwise), "alternate"
+# iterations: number of direction changes for alternate mode
+# temperature_c: target temperature if jar has a heater
+
+[profile.clean]
+label = "Clean"
+rpm = 120
+time_s = 180
+direction = "alternate"
+iterations = 3
+
+# Optional spin-off phase (lift basket, spin to shed excess solution)
+# [profile.clean.spinoff]
+# lift_mm = 20
+# rpm = 150
+# time_s = 10
+
+[profile.rinse]
+label = "Rinse"
+rpm = 100
+time_s = 120
+direction = "cw"
+iterations = 1
+
+[profile.dry]
+label = "Dry"
+rpm = 60
+time_s = 600
+direction = "alternate"
+iterations = 6
+temperature_c = 45
+
+# =============================================================================
+# PROGRAMS
+# =============================================================================
+# Programs are sequences of jar/profile pairs.
+# For manual machines, the display prompts user to move basket between steps.
+# For automated machines, the firmware controls lift/tower motors.
+
+[program.full_clean]
+label = "Full Clean"
+steps = [
+    { jar = "clean", profile = "clean" },
+    { jar = "rinse1", profile = "rinse" },
+    { jar = "rinse2", profile = "rinse" },
+    { jar = "dry", profile = "dry" },
+]
+
+[program.quick_clean]
+label = "Quick Clean"
+steps = [
+    { jar = "clean", profile = "clean" },
+    { jar = "rinse1", profile = "rinse" },
+]
+
+[program.dry_only]
+label = "Dry Only"
+steps = [
+    { jar = "dry", profile = "dry" },
+]
+
+# =============================================================================
+# DISPLAY (optional)
+# =============================================================================
+
+[display]
+type = "v0_display"
+uart_tx_pin = "gpio0"
+uart_rx_pin = "gpio1"
+baud = 115200
+
+# =============================================================================
+# ACCESSORIES (optional)
+# =============================================================================
+
+# Ultrasonic cleaner module:
+# [ultrasonic.clean_jar]
+# trigger_pin = "gpio16"
+# power = 100
+
+# Status LEDs:
+# [neopixel.status]
+# pin = "gpio24"
+# count = 8
+
+# Exhaust fan:
+# [fan.exhaust]
+# pin = "gpio17"
+# pwm = true

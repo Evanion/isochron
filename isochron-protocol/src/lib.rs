@@ -25,5 +25,5 @@ pub mod messages;
 pub mod events;
 
 pub use frame::{Frame, FrameError, FrameParser, FRAME_START, MAX_PAYLOAD_SIZE};
-pub use messages::{DisplayCommand, PicoMessage};
+pub use messages::{ControllerCommand, DisplayCommand, PicoMessage};
 pub use events::InputEvent;

@@ -15,8 +15,10 @@ use defmt::*;
 use embassy_executor::Spawner;
 use embassy_rp::adc::{Adc, Channel, InterruptHandler as AdcInterruptHandler};
 use embassy_rp::bind_interrupts;
-use embassy_rp::gpio::{AnyPin, Input, Level, Output, Pull};
-use embassy_rp::peripherals::{FLASH, PIO0, UART0, UART1};
+use embassy_rp::gpio::{Input, Level, Output, Pull};
+use embassy_rp::pwm::{Config as PwmConfig, Pwm};
+use embassy_rp::peripherals::{DMA_CH2, FLASH, PIO0, UART0, UART1};
+use embassy_rp::Peri;
 use embassy_rp::pio::Pio;
 use embassy_rp::uart::{BufferedInterruptHandler, Config as UartConfig, InterruptHandler as UartInterruptHandler, Uart};
 use embedded_alloc::LlffHeap as Heap;
@@ -30,7 +32,8 @@ use isochron_hal_rp2040::stepper::PioStepper;
 use crate::config::{parse_config, ConfigPersistence};
 
 use isochron_core::config::{
-    JarConfig, MachineCapabilities, MachineConfig, ProfileConfig, ProgramConfig, ProgramStep,
+    JarConfig, MachineCapabilities, MachineConfig, MotorType, ProfileConfig, ProgramConfig,
+    ProgramStep,
 };
 use isochron_core::scheduler::DirectionMode;
 
@@ -86,10 +89,14 @@ async fn main(spawner: Spawner) {
     // Load configuration from flash (or use embedded defaults)
     let config = load_config_from_flash(p.FLASH, p.DMA_CH2).await;
 
-    // Extract stepper config values before moving config
-    // (find_stepper returns a reference, so we clone what we need)
-    let (steps_per_rev, enable_inverted, stepper_microsteps) = {
-        if let Some(stepper) = config.find_stepper("spin") {
+    // Get motor type before extracting other config
+    let motor_type = config.motor_type;
+    info!("Motor type: {:?}", motor_type);
+
+    // Extract motor config values based on motor type
+    // Stepper config (only used if motor_type == Stepper)
+    let stepper_config_values = if motor_type == MotorType::Stepper {
+        config.find_stepper("spin").map(|stepper| {
             let full_steps = stepper.full_steps_per_rotation as u32;
             let microsteps = stepper.microsteps as u32;
             let gear_num = stepper.gear_ratio_num as u32;
@@ -100,30 +107,56 @@ async fn main(spawner: Spawner) {
                 steps, full_steps, microsteps, gear_num, gear_den, stepper.enable_pin.inverted
             );
             (steps, stepper.enable_pin.inverted, stepper.microsteps)
-        } else {
-            warn!("No spin stepper config found, using defaults");
-            (200 * 16 * 3, true, 16u8) // Default: 200 steps * 16 microsteps * 3:1 ratio
-        }
+        })
+    } else {
+        None
     };
 
-    // Extract TMC2209 config values
-    let tmc_config_values = config
-        .tmc2209s
-        .iter()
-        .find(|t| t.stepper_name.as_str() == "spin")
-        .map(|tmc| {
+    // DC motor config (only used if motor_type == Dc)
+    let dc_motor_config_values = if motor_type == MotorType::Dc {
+        config.find_dc_motor("spin").map(|dc| {
             info!(
-                "TMC2209 config: addr={}, run={}mA, stealthchop={}, sg={}",
-                tmc.uart_address, tmc.run_current_ma, tmc.stealthchop, tmc.stall_threshold
+                "DC motor config: pwm_freq={}Hz, min_duty={}%, soft_start={}ms",
+                dc.pwm_frequency, dc.min_duty, dc.soft_start_ms
             );
-            (
-                tmc.uart_address,
-                tmc.run_current_ma,
-                tmc.hold_current_ma,
-                tmc.stealthchop,
-                tmc.stall_threshold,
-            )
-        });
+            (dc.min_duty, dc.soft_start_ms, dc.soft_stop_ms)
+        })
+    } else {
+        None
+    };
+
+    // AC motor config (only used if motor_type == Ac)
+    let ac_motor_config_values = if motor_type == MotorType::Ac {
+        config.find_ac_motor("spin").map(|ac| {
+            info!("AC motor config: active_high={}", ac.active_high);
+            (ac.active_high, ac.direction_pin.is_some())
+        })
+    } else {
+        None
+    };
+
+    // Extract TMC2209 config values (only for stepper)
+    let tmc_config_values = if motor_type == MotorType::Stepper {
+        config
+            .tmc2209s
+            .iter()
+            .find(|t| t.stepper_name.as_str() == "spin")
+            .map(|tmc| {
+                info!(
+                    "TMC2209 config: addr={}, run={}mA, stealthchop={}, sg={}",
+                    tmc.uart_address, tmc.run_current_ma, tmc.stealthchop, tmc.stall_threshold
+                );
+                (
+                    tmc.uart_address,
+                    tmc.run_current_ma,
+                    tmc.hold_current_ma,
+                    tmc.stealthchop,
+                    tmc.stall_threshold,
+                )
+            })
+    } else {
+        None
+    };
 
     // Extract heater config values
     let heater_config_values = config.find_heater("dryer").map(|heater| {
@@ -150,33 +183,107 @@ async fn main(spawner: Spawner) {
 
     info!("UART initialized for display communication");
 
-    // Setup PIO0 for stepper motor control
-    // Pin assignments are board-specific (SKR Pico: STEP=GPIO11, DIR=GPIO10, ENABLE=GPIO12)
-    // Motor parameters come from config (already extracted above)
-    let Pio {
-        mut common,
-        sm0,
-        ..
-    } = Pio::new(p.PIO0, Irqs);
+    // Motor hardware initialization (conditional based on motor_type)
+    // Only one motor type is active at a time - use enum to hold resources
+    enum MotorResources {
+        Stepper(PioStepper<'static, PIO0, 0>),
+        Dc(Pwm<'static>, Option<Output<'static>>, Option<Output<'static>>, tasks::DcMotorFwConfig),
+        Ac(Output<'static>, Option<Output<'static>>, tasks::AcMotorFwConfig),
+    }
 
-    let stepper_config = StepGeneratorConfig {
-        step_pin: 11,
-        dir_pin: 10,
-        enable_pin: 12,
-        enable_inverted,
-        steps_per_rev,
+    let motor_resources = match motor_type {
+        MotorType::Stepper => {
+            // Setup PIO0 for stepper motor control
+            // Pin assignments are board-specific (SKR Pico: STEP=GPIO11, DIR=GPIO10, ENABLE=GPIO12)
+            let Pio {
+                mut common,
+                sm0,
+                ..
+            } = Pio::new(p.PIO0, Irqs);
+
+            let (steps_per_rev, enable_inverted, _microsteps) = stepper_config_values
+                .unwrap_or_else(|| {
+                    warn!("No stepper config found, using defaults");
+                    (3200, false, 16)  // 200 steps * 16 microsteps
+                });
+
+            let stepper_config = StepGeneratorConfig {
+                step_pin: 11,
+                dir_pin: 10,
+                enable_pin: 12,
+                enable_inverted,
+                steps_per_rev,
+            };
+
+            let stepper = PioStepper::new(
+                &mut common,
+                sm0,
+                p.PIN_11,  // step pin
+                p.PIN_10,  // dir pin
+                p.PIN_12,  // enable pin
+                stepper_config,
+            );
+
+            info!("PIO stepper initialized");
+            MotorResources::Stepper(stepper)
+        }
+        MotorType::Dc => {
+            // PWM on GPIO11 (slice 5, channel B)
+            let mut pwm_config = PwmConfig::default();
+            pwm_config.top = 1000; // 125kHz / 1000 = 125Hz base
+            pwm_config.compare_b = 0; // Start at 0% duty
+            let pwm = Pwm::new_output_b(p.PWM_SLICE5, p.PIN_11, pwm_config);
+
+            // Direction pin (GPIO10)
+            let dir_pin = Output::new(p.PIN_10, Level::Low);
+
+            // Enable pin (GPIO12)
+            let enable_pin = Output::new(p.PIN_12, Level::Low);
+
+            let (min_duty, soft_start_ms, soft_stop_ms) = dc_motor_config_values
+                .unwrap_or_else(|| {
+                    warn!("No DC motor config found, using defaults");
+                    (20, 500, 300)
+                });
+
+            let fw_config = tasks::DcMotorFwConfig {
+                min_duty,
+                soft_start_ms,
+                soft_stop_ms,
+                pwm_top: 1000,
+            };
+
+            info!("DC motor PWM initialized");
+            MotorResources::Dc(pwm, Some(dir_pin), Some(enable_pin), fw_config)
+        }
+        MotorType::Ac => {
+            // Relay pin (GPIO12) - same as enable pin on stepper
+            let relay_pin = Output::new(p.PIN_12, Level::Low);
+
+            // Direction pin (GPIO10) - optional for reversible AC motors
+            let (active_high, has_direction) = ac_motor_config_values
+                .unwrap_or_else(|| {
+                    warn!("No AC motor config found, using defaults");
+                    (true, false)
+                });
+
+            let dir_pin = if has_direction {
+                Some(Output::new(p.PIN_10, Level::Low))
+            } else {
+                None
+            };
+
+            let fw_config = tasks::AcMotorFwConfig {
+                relay_type: isochron_drivers::motor::ac::AcRelayType::Mechanical,
+                min_switch_delay_ms: 100,
+                active_high,
+                has_direction,
+            };
+
+            info!("AC motor relay initialized");
+            MotorResources::Ac(relay_pin, dir_pin, fw_config)
+        }
     };
-
-    let stepper = PioStepper::new(
-        &mut common,
-        sm0,
-        p.PIN_11,
-        AnyPin::from(p.PIN_10),
-        AnyPin::from(p.PIN_12),
-        stepper_config,
-    );
-
-    info!("PIO stepper initialized");
 
     // Setup ADC for temperature sensing
     // Pin assignment is board-specific (SKR Pico TH0: GPIO27)
@@ -207,56 +314,66 @@ async fn main(spawner: Spawner) {
 
     info!("ADC and heater initialized");
 
-    // Setup UART1 for TMC2209 communication
-    // Pin assignments are board-specific (SKR Pico TMC: GPIO8 TX, GPIO9 RX)
-    let tmc_uart_config = {
-        let mut cfg = UartConfig::default();
-        cfg.baudrate = 115200;
-        cfg
-    };
-    let tmc_uart = Uart::new(
-        p.UART1,
-        p.PIN_8,
-        p.PIN_9,
-        Irqs,
-        p.DMA_CH0,
-        p.DMA_CH1,
-        tmc_uart_config,
-    );
-    let (tmc_tx, _tmc_rx) = tmc_uart.split();
+    // TMC2209 setup (only for stepper motor type)
+    let tmc_resources = if motor_type == MotorType::Stepper {
+        // Setup UART1 for TMC2209 communication
+        // Pin assignments are board-specific (SKR Pico TMC: GPIO8 TX, GPIO9 RX)
+        let tmc_uart_config = {
+            let mut cfg = UartConfig::default();
+            cfg.baudrate = 115200;
+            cfg
+        };
+        let tmc_uart = Uart::new(
+            p.UART1,
+            p.PIN_8,
+            p.PIN_9,
+            Irqs,
+            p.DMA_CH0,
+            p.DMA_CH1,
+            tmc_uart_config,
+        );
+        let (tmc_tx, _tmc_rx) = tmc_uart.split();
 
-    // TMC2209 configuration from config (already extracted above)
-    let tmc_config = if let Some((uart_addr, run_ma, hold_ma, stealthchop, sg_thresh)) =
-        tmc_config_values
-    {
-        isochron_drivers::stepper::tmc2209::Tmc2209Config {
-            uart_address: uart_addr,
-            run_current_ma: run_ma,
-            hold_current_ma: hold_ma,
-            stealthchop,
-            stallguard_threshold: sg_thresh,
-            microsteps: stepper_microsteps.into(), // u8 -> u16 safely
-        }
+        // Get microsteps from stepper config for TMC
+        let stepper_microsteps = stepper_config_values.map(|(_, _, ms)| ms).unwrap_or(16);
+
+        // TMC2209 configuration from config (already extracted above)
+        let tmc_config = if let Some((uart_addr, run_ma, hold_ma, stealthchop, sg_thresh)) =
+            tmc_config_values
+        {
+            isochron_drivers::stepper::tmc2209::Tmc2209Config {
+                uart_address: uart_addr,
+                run_current_ma: run_ma,
+                hold_current_ma: hold_ma,
+                stealthchop,
+                stallguard_threshold: sg_thresh,
+                microsteps: stepper_microsteps.into(), // u8 -> u16 safely
+            }
+        } else {
+            warn!("No TMC2209 config found, using defaults");
+            isochron_drivers::stepper::tmc2209::Tmc2209Config {
+                uart_address: 0,
+                run_current_ma: 800,
+                hold_current_ma: 400,
+                stealthchop: true,
+                stallguard_threshold: 80,
+                microsteps: 16,
+            }
+        };
+
+        info!("TMC UART initialized");
+
+        // Setup TMC2209 DIAG pin for StallGuard stall detection
+        // SKR Pico stepper X DIAG pin is GPIO17
+        let diag_pin = Input::new(p.PIN_17, Pull::Down);
+        let stall_config = tasks::StallMonitorConfig::default();
+
+        info!("TMC DIAG pin initialized");
+
+        Some((tmc_tx, tmc_config, diag_pin, stall_config))
     } else {
-        warn!("No TMC2209 config found, using defaults");
-        isochron_drivers::stepper::tmc2209::Tmc2209Config {
-            uart_address: 0,
-            run_current_ma: 800,
-            hold_current_ma: 400,
-            stealthchop: true,
-            stallguard_threshold: 80,
-            microsteps: 16,
-        }
+        None
     };
-
-    info!("TMC UART initialized");
-
-    // Setup TMC2209 DIAG pin for StallGuard stall detection
-    // SKR Pico stepper X DIAG pin is GPIO17
-    let diag_pin = Input::new(p.PIN_17, Pull::Down);
-    let stall_config = tasks::StallMonitorConfig::default();
-
-    info!("TMC DIAG pin initialized");
 
     // Machine capabilities (manual machine for now - no lift/tower motors)
     let capabilities = MachineCapabilities {
@@ -271,13 +388,37 @@ async fn main(spawner: Spawner) {
     spawner.spawn(tasks::tick_task()).unwrap();
     spawner.spawn(tasks::display_rx_task(rx)).unwrap();
     spawner.spawn(tasks::display_tx_task(tx)).unwrap();
-    spawner.spawn(tasks::stepper_task(stepper)).unwrap();
+
+    // Motor task - spawn based on motor resources
+    match motor_resources {
+        MotorResources::Stepper(stepper) => {
+            spawner.spawn(tasks::stepper_task(stepper)).unwrap();
+            info!("Stepper motor task spawned");
+            // TMC2209 and stall monitor tasks (only for stepper)
+            if let Some((tmc_tx, tmc_config, diag_pin, stall_config)) = tmc_resources {
+                spawner.spawn(tasks::tmc_init_task(tmc_tx, tmc_config)).unwrap();
+                spawner
+                    .spawn(tasks::stall_monitor_task(diag_pin, stall_config))
+                    .unwrap();
+                info!("TMC and stall monitor tasks spawned");
+            }
+        }
+        MotorResources::Dc(pwm, dir_pin, enable_pin, fw_config) => {
+            spawner
+                .spawn(tasks::dc_motor_task(pwm, dir_pin, enable_pin, fw_config))
+                .unwrap();
+            info!("DC motor task spawned");
+        }
+        MotorResources::Ac(relay_pin, dir_pin, fw_config) => {
+            spawner
+                .spawn(tasks::ac_motor_task(relay_pin, dir_pin, fw_config))
+                .unwrap();
+            info!("AC motor task spawned");
+        }
+    }
+
     spawner
         .spawn(tasks::heater_task(adc, therm_channel, heater_pin, heater_config))
-        .unwrap();
-    spawner.spawn(tasks::tmc_init_task(tmc_tx, tmc_config)).unwrap();
-    spawner
-        .spawn(tasks::stall_monitor_task(diag_pin, stall_config))
         .unwrap();
     spawner
         .spawn(tasks::controller_task(capabilities, programs, profiles, jars))
@@ -308,8 +449,8 @@ fn init_heap() {
 /// Attempts to load TOML config from flash. If not found or invalid,
 /// returns the embedded default configuration.
 async fn load_config_from_flash(
-    flash: FLASH,
-    dma: embassy_rp::peripherals::DMA_CH2,
+    flash: Peri<'static, FLASH>,
+    dma: Peri<'static, DMA_CH2>,
 ) -> MachineConfig {
     let flash_storage = FlashStorage::new(flash, dma);
     let mut persistence = ConfigPersistence::new(flash_storage);

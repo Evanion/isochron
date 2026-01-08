@@ -1,0 +1,68 @@
+# BTT SKR Pico Board Configuration
+#
+# Pin mappings for BigTreeTech SKR Pico controller board.
+# Reference: https://github.com/bigtreetech/SKR-Pico
+
+[board]
+name = "BTT SKR Pico"
+mcu = "rp2040"
+flash_size = 2097152  # 2MB
+
+# Stepper motor pins (directly on board)
+[stepper.x]
+step = "gpio11"
+dir = "gpio10"
+enable = "!gpio12"  # Active low
+
+[stepper.y]
+step = "gpio6"
+dir = "gpio5"
+enable = "!gpio7"
+
+[stepper.z]
+step = "gpio19"
+dir = "gpio28"
+enable = "!gpio2"
+
+[stepper.e]
+step = "gpio14"
+dir = "gpio13"
+enable = "!gpio15"
+
+# Heater outputs
+[heaters]
+heater0 = "gpio23"  # HE0
+heater1 = "gpio22"  # HB (heated bed, can be repurposed)
+
+# Temperature sensors (ADC)
+[thermistors]
+th0 = "gpio26"  # ADC0
+th1 = "gpio27"  # ADC1
+th2 = "gpio28"  # ADC2 (shared with Z dir on some configs)
+
+# Fan outputs
+[fans]
+fan0 = "gpio20"  # FAN0 (PWM capable)
+fan1 = "gpio21"  # FAN1 (PWM capable)
+
+# Communication
+[uart]
+# UART0 for display communication
+display_tx = "gpio0"
+display_rx = "gpio1"
+display_baud = 250000
+
+# Endstops / sensors
+[endstops]
+x_stop = "gpio4"
+y_stop = "gpio3"
+z_stop = "gpio25"
+
+# Neopixel / LED
+[leds]
+neopixel = "gpio24"
+neopixel_count = 1
+
+# USB
+[usb]
+enabled = true
