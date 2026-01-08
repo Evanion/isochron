@@ -36,7 +36,7 @@ impl Default for AcMotorFwConfig {
     }
 }
 
-/// AC motor control task for the spin motor
+/// AC motor control task for the basket motor
 ///
 /// Waits for motor commands and controls the AC motor via relay.
 /// The motor command's RPM field is interpreted as on (>0) or off (0).

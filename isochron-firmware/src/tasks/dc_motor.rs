@@ -37,7 +37,7 @@ impl Default for DcMotorFwConfig {
     }
 }
 
-/// DC motor control task for the spin motor
+/// DC motor control task for the basket motor
 ///
 /// Waits for motor commands and controls the DC motor via PWM.
 /// The motor command's RPM field is interpreted as speed percentage (0-100).

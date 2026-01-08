@@ -17,8 +17,8 @@ version = 1
 # STEPPERS
 # =============================================================================
 
-# Basket spin motor (rotates parts in solution) - always required
-[stepper.spin]
+# Basket motor (rotates parts in solution) - always required
+[stepper.basket]
 step_pin = "gpio11"
 dir_pin = "gpio10"
 enable_pin = "!gpio12"
@@ -27,18 +27,18 @@ gear_ratio = "3:1"                  # 3:1 belt reduction
 full_steps_per_rotation = 200       # 1.8 degree motor
 microsteps = 16
 
-# TMC2209 driver configuration for spin motor
-[tmc2209.spin]
+# TMC2209 driver configuration for basket motor
+[tmc2209.basket]
 uart_address = 0
 run_current = 800                   # mA
 hold_current = 400                  # mA (optional, defaults to 50% of run)
 stealthchop = true
 stallguard_threshold = 80
 
-# Lift motor (raises/lowers basket) - optional for automated machines
+# Z motor (raises/lowers basket) - optional for automated machines
 # Uncomment to enable:
 #
-# [stepper.lift]
+# [stepper.z]
 # step_pin = "gpio6"
 # dir_pin = "gpio5"
 # enable_pin = "!gpio7"
@@ -50,16 +50,16 @@ stallguard_threshold = 80
 # position_max = 150                # mm max travel
 # homing_speed = 10                 # mm/s
 #
-# [tmc2209.lift]
+# [tmc2209.z]
 # uart_address = 1
 # run_current = 800
 # stealthchop = true
 # stallguard_threshold = 60
 
-# Tower/position motor (rotates between jars) - optional for automated machines
+# X motor (rotates between jars) - optional for automated machines
 # Uncomment to enable:
 #
-# [stepper.tower]
+# [stepper.x]
 # step_pin = "gpio19"
 # dir_pin = "gpio28"
 # enable_pin = "!gpio2"
@@ -71,7 +71,7 @@ stallguard_threshold = 80
 # position_max = 360                # degrees (full rotation)
 # homing_speed = 30                 # deg/s
 #
-# [tmc2209.tower]
+# [tmc2209.x]
 # uart_address = 2
 # run_current = 600
 # stealthchop = true
@@ -105,25 +105,25 @@ hysteresis = 2
 # Define physical jar positions for automated machines.
 # For manual machines, these define the jar sequence only.
 #
-# tower_pos: degrees from home (for tower rotation)
-# lift_pos: mm down from top (for lift motor)
+# x_pos: degrees from home (for x motor rotation/jar selection)
+# z_pos: mm down from top (for z motor/lift)
 # heater: optional heater name to use for this jar
 
 [jar.clean]
-tower_pos = 0
-lift_pos = 120
+x_pos = 0
+z_pos = 120
 
 [jar.rinse1]
-tower_pos = 90
-lift_pos = 120
+x_pos = 90
+z_pos = 120
 
 [jar.rinse2]
-tower_pos = 180
-lift_pos = 120
+x_pos = 180
+z_pos = 120
 
 [jar.dry]
-tower_pos = 270
-lift_pos = 100
+x_pos = 270
+z_pos = 100
 heater = "dryer"
 
 # =============================================================================

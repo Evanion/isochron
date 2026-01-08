@@ -41,7 +41,7 @@ pub enum Event {
     NextStep,
 
     // Spin-off events
-    /// Start automated spin-off (has lift motor)
+    /// Start automated spin-off (has z motor)
     StartSpinOff,
     /// Prompt user to lift basket (manual machine)
     PromptSpinOff,

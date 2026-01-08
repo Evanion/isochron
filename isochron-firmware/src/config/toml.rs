@@ -191,11 +191,11 @@ pub fn parse_config(input: &str) -> Result<MachineConfig, ParseError> {
     Ok(config)
 }
 
-/// Parse section header like "stepper spin", "stepper.spin" or "profile.clean.spinoff"
+/// Parse section header like "stepper basket", "stepper.basket" or "profile.clean.spinoff"
 fn parse_section_header(header: &str) -> Result<Section, ParseError> {
     let header = header.trim();
 
-    // Check for dotted sections (stepper.spin, profile.clean.spinoff, etc.)
+    // Check for dotted sections (stepper.basket, profile.clean.spinoff, etc.)
     if header.contains('.') {
         let parts: Vec<&str> = header.split('.').collect();
 
@@ -205,7 +205,7 @@ fn parse_section_header(header: &str) -> Result<Section, ParseError> {
             return Ok(Section::ProfileSpinoff(name));
         }
 
-        // Handle 2-part dotted sections (stepper.spin, tmc2209.spin, etc.)
+        // Handle 2-part dotted sections (stepper.basket, tmc2209.basket, etc.)
         if parts.len() == 2 {
             let section_type = parts[0];
             let name_str = parts[1];
@@ -610,8 +610,8 @@ fn apply_value(
         Section::Jar(_) => {
             let j = current_jar.as_mut().ok_or(ParseError::InvalidSection)?;
             match key {
-                "tower_pos" => j.tower_pos = parse_int(value)?,
-                "lift_pos" => j.lift_pos = parse_int(value)?,
+                "x_pos" | "tower_pos" => j.x_pos = parse_int(value)?, // tower_pos for backwards compat
+                "z_pos" | "lift_pos" => j.z_pos = parse_int(value)?, // lift_pos for backwards compat
                 "heater" => {
                     let name = parse_string(value)?;
                     j.heater = Some(HString::try_from(name).map_err(|_| ParseError::InvalidValue)?);
@@ -813,8 +813,8 @@ mod tests {
 
     #[test]
     fn test_parse_section_header() {
-        match parse_section_header("stepper spin").unwrap() {
-            Section::Stepper(name) => assert_eq!(name.as_str(), "spin"),
+        match parse_section_header("stepper basket").unwrap() {
+            Section::Stepper(name) => assert_eq!(name.as_str(), "basket"),
             _ => panic!("Wrong section type"),
         }
 
@@ -855,7 +855,7 @@ mod tests {
     #[test]
     fn test_parse_minimal_config() {
         let config_str = r#"
-[stepper spin]
+[stepper basket]
 step_pin = "gpio11"
 dir_pin = "gpio10"
 enable_pin = "!gpio12"
@@ -867,7 +867,7 @@ uart_rx_pin = "gpio1"
 
         let config = parse_config(config_str).unwrap();
         assert_eq!(config.steppers.len(), 1);
-        assert_eq!(config.steppers[0].name.as_str(), "spin");
+        assert_eq!(config.steppers[0].name.as_str(), "basket");
         assert_eq!(config.steppers[0].step_pin.pin, 11);
         assert!(config.steppers[0].enable_pin.inverted);
         assert_eq!(config.display.uart_tx_pin, 0);

@@ -81,10 +81,10 @@ impl Default for ProfileConfig {
 pub struct JarConfig {
     /// Jar name/identifier
     pub name: String<MAX_LABEL_LEN>,
-    /// Tower/position motor position (degrees from home)
-    pub tower_pos: i32,
-    /// Lift motor position (mm down from top)
-    pub lift_pos: i32,
+    /// X-axis motor position for jar selection (degrees from home)
+    pub x_pos: i32,
+    /// Z-axis motor position for lift (mm down from top)
+    pub z_pos: i32,
     /// Associated heater name (optional)
     pub heater: Option<String<MAX_LABEL_LEN>>,
     /// Associated ultrasonic module name (optional)
@@ -186,27 +186,27 @@ impl Default for UiConfig {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MachineCapabilities {
-    /// Has lift motor
-    pub has_lift: bool,
-    /// Has tower/position motor
-    pub has_tower: bool,
+    /// Has Z-axis lift motor
+    pub has_z: bool,
+    /// Has X-axis jar selection motor
+    pub has_x: bool,
     /// Has lid motor
     pub has_lid: bool,
     /// Number of heaters
     pub heater_count: u8,
-    /// Is an automated machine (has lift and tower)
+    /// Is an automated machine (has z and x motors)
     pub is_automated: bool,
 }
 
 impl MachineCapabilities {
     /// Determine capabilities from available hardware
-    pub fn from_config(has_lift: bool, has_tower: bool, has_lid: bool, heater_count: u8) -> Self {
+    pub fn from_config(has_z: bool, has_x: bool, has_lid: bool, heater_count: u8) -> Self {
         Self {
-            has_lift,
-            has_tower,
+            has_z,
+            has_x,
             has_lid,
             heater_count,
-            is_automated: has_lift && has_tower,
+            is_automated: has_z && has_x,
         }
     }
 }

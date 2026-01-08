@@ -18,10 +18,10 @@ Parameters shown with `#` prefix are optional with default values. Parameters wi
 
 ### [stepper name]
 
-Defines a stepper motor. The `name` identifies this stepper (e.g., `spin`, `lift`, `tower`).
+Defines a stepper motor. The `name` identifies this stepper (e.g., `basket`, `z`, `x`).
 
 ```toml
-[stepper spin]
+[stepper basket]
 step_pin = "gpio11"
 #   The GPIO pin for step pulses. This parameter must be provided.
 
@@ -34,7 +34,7 @@ enable_pin = "!gpio12"
 
 #endstop_pin = "^gpio4"
 #   The GPIO pin for the endstop switch. Prefix with ^ for pull-up.
-#   Only required for position-controlled steppers (lift, tower).
+#   Only required for position-controlled steppers (z, x).
 #   Can also use "tmc2209_name:virtual_endstop" for sensorless homing.
 
 #full_steps_per_rotation = 200
@@ -47,7 +47,7 @@ enable_pin = "!gpio12"
 
 #rotation_distance = 360
 #   The distance traveled (in mm or degrees) per full motor rotation.
-#   For the spin motor, this is typically 360 (degrees).
+#   For the basket motor, this is typically 360 (degrees).
 #   For linear axes, this is the leadscrew pitch (mm).
 #   The default is 360.
 
@@ -74,12 +74,12 @@ Reserved stepper names with special behavior:
 
 | Name | Purpose | Required |
 |------|---------|----------|
-| `spin` | Basket rotation motor | Yes |
-| `lift` | Basket vertical movement | Optional |
-| `tower` | Basket horizontal positioning | Optional |
+| `basket` | Basket rotation motor | Yes |
+| `z` | Basket vertical movement (lift) | Optional |
+| `x` | Basket horizontal positioning (jar selection) | Optional |
 | `lid` | Drying chamber lid | Optional |
 
-**Note:** A machine with both `lift` and `tower` steppers is considered "automated" - the firmware controls basket movement between jars.
+**Note:** A machine with both `z` and `x` steppers is considered "automated" - the firmware controls basket movement between jars.
 
 ---
 
@@ -90,8 +90,8 @@ Reserved stepper names with special behavior:
 Configures a TMC2209 stepper driver. The `name` must match a `[stepper name]`.
 
 ```toml
-[tmc2209 spin]
-#   Configure TMC2209 for the "spin" stepper.
+[tmc2209 basket]
+#   Configure TMC2209 for the "basket" stepper.
 
 uart_tx_pin = "gpio8"
 #   UART transmit pin. This parameter must be provided.
@@ -129,17 +129,17 @@ uart_rx_pin = "gpio9"
 Multiple TMC2209 drivers can share a single UART bus using different addresses:
 
 ```toml
-[tmc2209 spin]
+[tmc2209 basket]
 uart_tx_pin = "gpio8"
 uart_rx_pin = "gpio9"
 uart_address = 0
 
-[tmc2209 lift]
+[tmc2209 z]
 uart_tx_pin = "gpio8"
 uart_rx_pin = "gpio9"
 uart_address = 1
 
-[tmc2209 tower]
+[tmc2209 x]
 uart_tx_pin = "gpio8"
 uart_rx_pin = "gpio9"
 uart_address = 2
@@ -254,8 +254,8 @@ The firmware monitors heaters for safety:
 Defines a DC motor with PWM speed control. Use this instead of `[stepper]` for simple DC motors.
 
 ```toml
-[dc_motor spin]
-#   Configure DC motor named "spin".
+[dc_motor basket]
+#   Configure DC motor named "basket".
 
 pwm_pin = "gpio11"
 #   The GPIO pin for PWM output. This parameter must be provided.
@@ -303,8 +303,8 @@ rpm = 75  # 75% duty cycle for DC motors
 Defines an AC motor with relay control. Use this for AC induction motors that run at fixed speed.
 
 ```toml
-[ac_motor spin]
-#   Configure AC motor named "spin".
+[ac_motor basket]
+#   Configure AC motor named "basket".
 
 relay_pin = "gpio12"
 #   The GPIO pin controlling the motor relay/contactor.
@@ -391,14 +391,14 @@ Defines a jar (cleaning station) in the machine.
 [jar clean]
 #   Define jar named "clean".
 
-#tower_pos = 0
-#   Position in degrees from home for the tower motor (horizontal).
-#   Only used on automated machines with tower stepper.
+#x_pos = 0
+#   Position in degrees from home for the x motor (jar selection).
+#   Only used on automated machines with x stepper.
 #   The default is 0.
 
-#lift_pos = 120
-#   Position in mm from top for the lift motor (vertical).
-#   Only used on automated machines with lift stepper.
+#z_pos = 120
+#   Position in mm from top for the z motor (vertical lift).
+#   Only used on automated machines with z stepper.
 #   The default is 0.
 
 #heater = "dryer"
@@ -554,7 +554,7 @@ Here's a complete configuration for a manual 4-jar watch cleaning machine:
 
 # === STEPPERS ===
 
-[stepper spin]
+[stepper basket]
 step_pin = "gpio11"
 dir_pin = "gpio10"
 enable_pin = "!gpio12"
@@ -563,7 +563,7 @@ microsteps = 16
 rotation_distance = 360
 gear_ratio = "3:1"
 
-[tmc2209 spin]
+[tmc2209 basket]
 uart_tx_pin = "gpio8"
 uart_rx_pin = "gpio9"
 uart_address = 0
@@ -595,20 +595,20 @@ baud = 115200
 # === JARS ===
 
 [jar clean]
-tower_pos = 0
-lift_pos = 0
+x_pos = 0
+z_pos = 0
 
 [jar rinse1]
-tower_pos = 0
-lift_pos = 0
+x_pos = 0
+z_pos = 0
 
 [jar rinse2]
-tower_pos = 0
-lift_pos = 0
+x_pos = 0
+z_pos = 0
 
 [jar dry]
-tower_pos = 0
-lift_pos = 0
+x_pos = 0
+z_pos = 0
 heater = "dryer"
 
 # === PROFILES ===
@@ -705,7 +705,7 @@ The firmware validates configuration at boot:
 
 | Check | Action on Failure |
 |-------|-------------------|
-| Required stepper "spin" missing | Use defaults |
+| Required stepper "basket" missing | Use defaults |
 | Profile references unknown jar | Skip profile |
 | Program references unknown profile | Skip step |
 | Invalid pin number | Use defaults |

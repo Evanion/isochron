@@ -193,7 +193,7 @@ Use the `pico-ac-motor` profile for AC motor builds.
 [machine]
 motor_type = "dc"
 
-[dc_motor.spin]
+[dc_motor.basket]
 pwm_pin = "gpio11"
 dir_pin = "gpio10"
 enable_pin = "!gpio12"
@@ -210,7 +210,7 @@ soft_stop_ms = 300
 [machine]
 motor_type = "ac"
 
-[ac_motor.spin]
+[ac_motor.basket]
 enable_pin = "gpio11"
 direction_pin = "gpio10"  # Optional
 relay_type = "ssr"

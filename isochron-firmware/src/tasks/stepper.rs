@@ -10,10 +10,10 @@ use isochron_hal_rp2040::stepper::PioStepper;
 
 use crate::channels::MOTOR_CMD;
 
-/// Stepper control task for the spin motor
+/// Stepper control task for the basket motor
 ///
 /// Waits for motor commands and controls the PIO stepper accordingly.
-/// Uses PIO0 state machine 0 for the primary spin motor.
+/// Uses PIO0 state machine 0 for the primary basket motor.
 #[embassy_executor::task]
 pub async fn stepper_task(mut stepper: PioStepper<'static, PIO0, 0>) {
     info!("Stepper task started");
