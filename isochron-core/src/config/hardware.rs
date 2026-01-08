@@ -86,7 +86,7 @@ impl PinConfig {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct StepperHwConfig {
-    /// Stepper name (e.g., "spin", "lift", "tower")
+    /// Stepper name (e.g., "basket", "z", "x", "lid")
     pub name: String<MAX_LABEL_LEN>,
     /// Step pulse pin
     pub step_pin: PinConfig,
@@ -152,7 +152,7 @@ pub enum DcDriverType {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DcMotorHwConfig {
-    /// Motor name (e.g., "spin", "lift", "tower")
+    /// Motor name (e.g., "basket", "z", "x", "lid")
     pub name: String<MAX_LABEL_LEN>,
     /// PWM output pin for speed control
     pub pwm_pin: PinConfig,
@@ -174,7 +174,7 @@ pub struct DcMotorHwConfig {
     pub endstop_up: Option<PinConfig>,
     /// Second endstop pin (for bi-directional position control)
     pub endstop_down: Option<PinConfig>,
-    /// Home endstop (for tower/rotational)
+    /// Home endstop (for x-axis/rotational)
     pub endstop_home: Option<PinConfig>,
 }
 
@@ -195,7 +195,7 @@ pub enum AcRelayType {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct AcMotorHwConfig {
-    /// Motor name (e.g., "spin", "lift", "tower")
+    /// Motor name (e.g., "basket", "z", "x", "lid")
     pub name: String<MAX_LABEL_LEN>,
     /// Relay enable pin (controls motor on/off)
     pub enable_pin: PinConfig,
@@ -209,7 +209,7 @@ pub struct AcMotorHwConfig {
     pub endstop_up: Option<PinConfig>,
     /// Second endstop pin (for bi-directional position control)
     pub endstop_down: Option<PinConfig>,
-    /// Home endstop (for tower/rotational)
+    /// Home endstop (for x-axis/rotational)
     pub endstop_home: Option<PinConfig>,
 }
 
@@ -352,42 +352,38 @@ impl MachineConfig {
         self.programs.iter().find(|p| p.label.as_str() == name)
     }
 
-    /// Check if this is an automated machine (has lift and tower motors)
+    /// Check if this is an automated machine (has z and x motors)
     pub fn is_automated(&self) -> bool {
         match self.motor_type {
             MotorType::Stepper => {
-                self.find_stepper("lift").is_some() && self.find_stepper("tower").is_some()
+                self.find_stepper("z").is_some() && self.find_stepper("x").is_some()
             }
-            MotorType::Dc => {
-                self.find_dc_motor("lift").is_some() && self.find_dc_motor("tower").is_some()
-            }
-            MotorType::Ac => {
-                self.find_ac_motor("lift").is_some() && self.find_ac_motor("tower").is_some()
-            }
+            MotorType::Dc => self.find_dc_motor("z").is_some() && self.find_dc_motor("x").is_some(),
+            MotorType::Ac => self.find_ac_motor("z").is_some() && self.find_ac_motor("x").is_some(),
         }
     }
 
-    /// Get the spin stepper (for stepper motor machines)
-    pub fn spin_stepper(&self) -> Option<&StepperHwConfig> {
-        self.find_stepper("spin")
+    /// Get the basket stepper (for stepper motor machines)
+    pub fn basket_stepper(&self) -> Option<&StepperHwConfig> {
+        self.find_stepper("basket")
     }
 
-    /// Get the spin DC motor (for DC motor machines)
-    pub fn spin_dc_motor(&self) -> Option<&DcMotorHwConfig> {
-        self.find_dc_motor("spin")
+    /// Get the basket DC motor (for DC motor machines)
+    pub fn basket_dc_motor(&self) -> Option<&DcMotorHwConfig> {
+        self.find_dc_motor("basket")
     }
 
-    /// Get the spin AC motor (for AC motor machines)
-    pub fn spin_ac_motor(&self) -> Option<&AcMotorHwConfig> {
-        self.find_ac_motor("spin")
+    /// Get the basket AC motor (for AC motor machines)
+    pub fn basket_ac_motor(&self) -> Option<&AcMotorHwConfig> {
+        self.find_ac_motor("basket")
     }
 
-    /// Check if a spin motor is configured (any type)
-    pub fn has_spin_motor(&self) -> bool {
+    /// Check if a basket motor is configured (any type)
+    pub fn has_basket_motor(&self) -> bool {
         match self.motor_type {
-            MotorType::Stepper => self.spin_stepper().is_some(),
-            MotorType::Dc => self.spin_dc_motor().is_some(),
-            MotorType::Ac => self.spin_ac_motor().is_some(),
+            MotorType::Stepper => self.basket_stepper().is_some(),
+            MotorType::Dc => self.basket_dc_motor().is_some(),
+            MotorType::Ac => self.basket_ac_motor().is_some(),
         }
     }
 }
@@ -415,6 +411,6 @@ mod tests {
         let config = MachineConfig::new();
         assert!(config.steppers.is_empty());
         assert!(!config.is_automated());
-        assert!(config.spin_stepper().is_none());
+        assert!(config.basket_stepper().is_none());
     }
 }

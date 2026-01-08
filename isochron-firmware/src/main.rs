@@ -99,7 +99,7 @@ async fn main(spawner: Spawner) {
     // Extract motor config values based on motor type
     // Stepper config (only used if motor_type == Stepper)
     let stepper_config_values = if motor_type == MotorType::Stepper {
-        config.find_stepper("spin").map(|stepper| {
+        config.find_stepper("basket").map(|stepper| {
             let full_steps = stepper.full_steps_per_rotation as u32;
             let microsteps = stepper.microsteps as u32;
             let gear_num = stepper.gear_ratio_num as u32;
@@ -117,7 +117,7 @@ async fn main(spawner: Spawner) {
 
     // DC motor config (only used if motor_type == Dc)
     let dc_motor_config_values = if motor_type == MotorType::Dc {
-        config.find_dc_motor("spin").map(|dc| {
+        config.find_dc_motor("basket").map(|dc| {
             info!(
                 "DC motor config: pwm_freq={}Hz, min_duty={}%, soft_start={}ms",
                 dc.pwm_frequency, dc.min_duty, dc.soft_start_ms
@@ -130,7 +130,7 @@ async fn main(spawner: Spawner) {
 
     // AC motor config (only used if motor_type == Ac)
     let ac_motor_config_values = if motor_type == MotorType::Ac {
-        config.find_ac_motor("spin").map(|ac| {
+        config.find_ac_motor("basket").map(|ac| {
             info!("AC motor config: active_high={}", ac.active_high);
             (ac.active_high, ac.direction_pin.is_some())
         })
@@ -143,7 +143,7 @@ async fn main(spawner: Spawner) {
         config
             .tmc2209s
             .iter()
-            .find(|t| t.stepper_name.as_str() == "spin")
+            .find(|t| t.stepper_name.as_str() == "basket")
             .map(|tmc| {
                 info!(
                     "TMC2209 config: addr={}, run={}mA, stealthchop={}, sg={}",
@@ -436,10 +436,10 @@ async fn main(spawner: Spawner) {
         None
     };
 
-    // Machine capabilities (manual machine for now - no lift/tower motors)
+    // Machine capabilities (manual machine for now - no z/x motors)
     let capabilities = MachineCapabilities {
-        has_lift: false,
-        has_tower: false,
+        has_z: false,
+        has_x: false,
         has_lid: false,
         heater_count: 1,
         is_automated: false,
@@ -652,8 +652,8 @@ fn create_minimal_fallback_config() -> MachineConfig {
     let _ = jar_name.push_str("jar1");
     let jar = JarConfig {
         name: jar_name,
-        tower_pos: 0,
-        lift_pos: 0,
+        x_pos: 0,
+        z_pos: 0,
         ..Default::default()
     };
     let _ = config.jars.push(jar);

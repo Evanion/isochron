@@ -688,7 +688,7 @@ mod tests {
     fn test_spinoff_flow() {
         let mut sched = Scheduler::new(MachineCapabilities {
             is_automated: true,
-            has_lift: true,
+            has_z: true,
             ..Default::default()
         });
 

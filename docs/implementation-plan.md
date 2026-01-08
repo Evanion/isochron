@@ -33,10 +33,10 @@ A watch cleaning machine has a **single basket** that moves through multiple jar
 ```
 
 **Stepper motors (progressive complexity):**
-- `spin` - rotates basket in solution (always required)
-- `lift` - raises/lowers basket into jars (optional)
-- `position` - moves basket between jars (optional)
-- `lid` - opens/closes drying chamber (optional)
+- `basket` - rotates basket in solution (always required)
+- `z` - raises/lowers basket into jars (optional)
+- `x` - moves basket between jars (optional)
+- `lid` - opens/closes jar lids (optional)
 
 **Accessories (optional):**
 - Per-jar heaters, ultrasonic modules, fans, pumps

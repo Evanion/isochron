@@ -89,7 +89,7 @@ pub trait StepperDriver {
     }
 }
 
-/// Extended trait for position-controlled steppers (lift, tower, lid)
+/// Extended trait for position-controlled steppers (z, x, lid)
 pub trait PositionStepperDriver: StepperDriver {
     /// Move to an absolute position
     ///

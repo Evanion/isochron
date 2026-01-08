@@ -19,7 +19,7 @@ pub enum State {
     EditProgram,
     /// Waiting for user to move basket to jar (manual machines)
     AwaitingJar,
-    /// Profile executing (spin motor active in jar)
+    /// Profile executing (basket motor active in jar)
     Running,
     /// Waiting for user to lift basket for spin-off (manual machines)
     AwaitingSpinOff,
