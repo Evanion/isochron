@@ -1,81 +1,120 @@
-# Isochron Watch Cleaner - Machine Configuration
+# Isochron Watch Cleaner - BTT SKR Pico Full Configuration
 #
-# This file is embedded into the firmware at build time.
-# Edit this file and rebuild to customize your machine.
+# This is a complete example for BTT SKR Pico with all optional features.
+# Copy this file to machine.toml and customize for your machine.
+#
+# Usage:
+#   cp examples/btt-pico.toml machine.toml
+#   # Edit machine.toml to match your setup
+#   cargo build --release
 #
 # Pin format:
 #   gpio11     - GPIO pin 11
 #   !gpio12    - GPIO pin 12, active low (inverted)
 #   ^gpio4     - GPIO pin 4 with pull-up resistor
 #
-# For SKR Pico pinout, see docs/Boards.md
+# For full pinout, see docs/Boards.md
 
 [machine]
 version = 1
 
+# Safe Z position for horizontal travel between jars (mm)
+# The basket lifts to this height before moving to the next jar.
+# Should be high enough to clear jar rims and any obstructions.
+# safe_z = 5
+
 # =============================================================================
 # STEPPERS
 # =============================================================================
+# Motor to board connector mapping (BTT SKR Pico):
+#   basket → E slot (GPIO 14, 13, 15)
+#   x      → X slot (GPIO 11, 10, 12)
+#   z      → Z slot (GPIO 19, 28, 2)
+#   lid    → Y slot (GPIO 6, 5, 7)
 
-# Basket spin motor (rotates parts in solution) - always required
-[stepper.spin]
-step_pin = "gpio11"
-dir_pin = "gpio10"
-enable_pin = "!gpio12"
+# Basket motor (rotates parts in solution) - always required
+# Uses E connector on BTT SKR Pico
+[stepper.basket]
+step_pin = "gpio14"
+dir_pin = "gpio13"
+enable_pin = "!gpio15"
 rotation_distance = 360             # degrees per motor rotation
 gear_ratio = "3:1"                  # 3:1 belt reduction
 full_steps_per_rotation = 200       # 1.8 degree motor
 microsteps = 16
 
-# TMC2209 driver configuration for spin motor
-[tmc2209.spin]
-uart_address = 0
+# TMC2209 driver configuration for basket motor
+[tmc2209.basket]
+uart_address = 3                    # E driver is address 3
 run_current = 800                   # mA
 hold_current = 400                  # mA (optional, defaults to 50% of run)
 stealthchop = true
 stallguard_threshold = 80
 
-# Lift motor (raises/lowers basket) - optional for automated machines
+# X motor (jar selection/carousel) - optional for automated machines
+# Uses X connector on BTT SKR Pico
 # Uncomment to enable:
 #
-# [stepper.lift]
-# step_pin = "gpio6"
-# dir_pin = "gpio5"
-# enable_pin = "!gpio7"
+# [stepper.x]
+# step_pin = "gpio11"
+# dir_pin = "gpio10"
+# enable_pin = "!gpio12"
+# rotation_distance = 200           # mm arc distance per motor rotation
+# gear_ratio = "5:1"
+# full_steps_per_rotation = 200
+# microsteps = 16
+# endstop_pin = "^gpio4"            # X endstop (homes to position_min)
+# position_min = 0                  # mm (Klipper-style)
+# position_max = 800                # mm (set based on your carousel size)
+# position_endstop = 0              # mm at endstop
+# homing_speed = 30                 # mm/s
+#
+# [tmc2209.x]
+# uart_address = 0                  # X driver is address 0
+# run_current = 600
+# stealthchop = true
+# stallguard_threshold = 60
+
+# Z motor (raises/lowers basket) - optional for automated machines
+# Uses Z connector on BTT SKR Pico
+# Uncomment to enable:
+#
+# [stepper.z]
+# step_pin = "gpio19"
+# dir_pin = "gpio28"
+# enable_pin = "!gpio2"
 # rotation_distance = 8             # mm per leadscrew rotation
 # full_steps_per_rotation = 200
 # microsteps = 16
-# endstop_pin = "^gpio4"            # physical endstop with pull-up
-# position_endstop = 0              # mm at endstop
+# endstop_pin = "^gpio25"           # Z endstop (homes to position_min)
+# position_min = 0                  # mm (Klipper-style)
 # position_max = 150                # mm max travel
+# position_endstop = 0              # mm at endstop
 # homing_speed = 10                 # mm/s
 #
-# [tmc2209.lift]
-# uart_address = 1
+# [tmc2209.z]
+# uart_address = 2                  # Z driver is address 2
 # run_current = 800
 # stealthchop = true
 # stallguard_threshold = 60
 
-# Tower/position motor (rotates between jars) - optional for automated machines
+# Lid motor (opens/closes jar lids) - optional
+# Uses Y connector on BTT SKR Pico
 # Uncomment to enable:
 #
-# [stepper.tower]
-# step_pin = "gpio19"
-# dir_pin = "gpio28"
-# enable_pin = "!gpio2"
+# [stepper.lid]
+# step_pin = "gpio6"
+# dir_pin = "gpio5"
+# enable_pin = "!gpio7"
 # rotation_distance = 360           # degrees per motor rotation
-# gear_ratio = "5:1"
+# full_steps_per_rotation = 200
 # microsteps = 16
-# endstop_pin = "^gpio16"           # home switch
-# position_endstop = 0              # degrees at home
-# position_max = 360                # degrees (full rotation)
-# homing_speed = 30                 # deg/s
+# endstop_pin = "^gpio3"            # Y endstop
 #
-# [tmc2209.tower]
-# uart_address = 2
-# run_current = 600
+# [tmc2209.lid]
+# uart_address = 1                  # Y driver is address 1
+# run_current = 400
 # stealthchop = true
-# stallguard_threshold = 60
 
 # =============================================================================
 # HEATERS
@@ -105,26 +144,33 @@ hysteresis = 2
 # Define physical jar positions for automated machines.
 # For manual machines, these define the jar sequence only.
 #
-# tower_pos: degrees from home (for tower rotation)
-# lift_pos: mm down from top (for lift motor)
+# x_pos: mm from home (for x motor/jar selection)
+#        For rotary carousels: arc distance from home position
+#        For linear machines: linear distance from home
+# z_pos: mm down from top (for z motor/lift)
 # heater: optional heater name to use for this jar
+# lid: optional lid motor name (multiple jars can share one motor)
 
 [jar.clean]
-tower_pos = 0
-lift_pos = 120
+x_pos = 0                 # mm (home position)
+z_pos = 120
+# lid = "lid"              # shared lid motor for all jars
 
 [jar.rinse1]
-tower_pos = 90
-lift_pos = 120
+x_pos = 200               # mm (arc distance for rotary, linear for straight)
+z_pos = 120
+# lid = "lid"
 
 [jar.rinse2]
-tower_pos = 180
-lift_pos = 120
+x_pos = 400               # mm
+z_pos = 120
+# lid = "lid"
 
 [jar.dry]
-tower_pos = 270
-lift_pos = 100
+x_pos = 600               # mm
+z_pos = 100
 heater = "dryer"
+# lid = "lid_dry"          # or individual lid motor for this jar
 
 # =============================================================================
 # PROFILES

@@ -535,6 +535,13 @@ fn apply_value(
                     s.gear_ratio_num = num;
                     s.gear_ratio_den = den;
                 }
+                // Position control (Klipper-style)
+                "position_min" => s.position_min = parse_int(value)?,
+                "position_max" => s.position_max = Some(parse_int(value)?),
+                "position_endstop" => s.position_endstop = Some(parse_int(value)?),
+                "homing_speed" => s.homing_speed = Some(parse_int(value)?),
+                "homing_retract_dist" => s.homing_retract_dist = Some(parse_int(value)?),
+                "homing_positive_dir" => s.homing_positive_dir = Some(parse_bool(value)?),
                 _ => {} // Ignore unknown keys
             }
         }

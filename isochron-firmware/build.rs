@@ -91,6 +91,7 @@ fn validate_config() {
     validate_required_sections(&config);
 
     // Validate section contents
+    validate_machine_section(&config);
     validate_profiles(&config);
     validate_programs(&config);
     validate_jars(&config);
@@ -117,19 +118,61 @@ fn format_error_lines(msg: &str) -> String {
 fn validate_required_sections(config: &toml::Value) {
     let mut errors = Vec::new();
 
+    // Determine motor type (defaults to "stepper")
+    let motor_type = config
+        .get("machine")
+        .and_then(|m| m.get("motor_type"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("stepper");
+
+    // Check for required basket motor based on motor_type
+    let has_basket = match motor_type {
+        "stepper" => config
+            .get("stepper")
+            .and_then(|s| s.get("basket"))
+            .is_some(),
+        "dc" => config
+            .get("dc_motor")
+            .and_then(|s| s.get("basket"))
+            .is_some(),
+        "ac" => config
+            .get("ac_motor")
+            .and_then(|s| s.get("basket"))
+            .is_some(),
+        _ => {
+            errors.push(format!(
+                "Invalid motor_type '{}' - must be 'stepper', 'dc', or 'ac'",
+                motor_type
+            ));
+            true // Skip basket check for invalid motor_type
+        }
+    };
+
+    if !has_basket {
+        let section_name = match motor_type {
+            "dc" => "[dc_motor.basket]",
+            "ac" => "[ac_motor.basket]",
+            _ => "[stepper.basket]",
+        };
+        errors.push(format!(
+            "Missing {} - basket motor is required",
+            section_name
+        ));
+    }
+
     // Check for at least one profile
     if config.get("profile").is_none() {
-        errors.push("Missing [profile.*] section - at least one profile is required");
+        errors.push("Missing [profile.*] section - at least one profile is required".to_string());
     }
 
     // Check for at least one program
     if config.get("program").is_none() {
-        errors.push("Missing [program.*] section - at least one program is required");
+        errors.push("Missing [program.*] section - at least one program is required".to_string());
     }
 
     // Check for at least one jar
     if config.get("jar").is_none() {
-        errors.push("Missing [jar.*] section - at least one jar is required");
+        errors.push("Missing [jar.*] section - at least one jar is required".to_string());
     }
 
     if !errors.is_empty() {
@@ -137,6 +180,62 @@ fn validate_required_sections(config: &toml::Value) {
             "\n\
             ╔══════════════════════════════════════════════════════════════════╗\n\
             ║  ERROR: Missing required sections in machine.toml                ║\n\
+            ╠══════════════════════════════════════════════════════════════════╣\n\
+            {}\n\
+            ╚══════════════════════════════════════════════════════════════════╝\n",
+            errors
+                .iter()
+                .map(|e| format!("║  • {:<62} ║", e))
+                .collect::<Vec<_>>()
+                .join("\n")
+        );
+    }
+}
+
+/// Validate [machine] section
+fn validate_machine_section(config: &toml::Value) {
+    let machine = match config.get("machine") {
+        Some(toml::Value::Table(t)) => t,
+        _ => return,
+    };
+
+    let mut errors = Vec::new();
+
+    // Validate safe_z against z stepper limits (if z stepper is configured)
+    if let Some(toml::Value::Integer(safe_z)) = machine.get("safe_z") {
+        // Get z stepper position limits
+        if let Some(z_stepper) = config
+            .get("stepper")
+            .and_then(|s| s.get("z"))
+            .and_then(|s| s.as_table())
+        {
+            let z_min = z_stepper
+                .get("position_min")
+                .and_then(|v| v.as_integer())
+                .unwrap_or(0);
+
+            if let Some(z_max) = z_stepper.get("position_max").and_then(|v| v.as_integer()) {
+                if *safe_z < z_min {
+                    errors.push(format!(
+                        "safe_z ({}) is below stepper.z position_min ({})",
+                        safe_z, z_min
+                    ));
+                }
+                if *safe_z > z_max {
+                    errors.push(format!(
+                        "safe_z ({}) is above stepper.z position_max ({})",
+                        safe_z, z_max
+                    ));
+                }
+            }
+        }
+    }
+
+    if !errors.is_empty() {
+        panic!(
+            "\n\
+            ╔══════════════════════════════════════════════════════════════════╗\n\
+            ║  ERROR: Invalid machine configuration                            ║\n\
             ╠══════════════════════════════════════════════════════════════════╣\n\
             {}\n\
             ╚══════════════════════════════════════════════════════════════════╝\n",
@@ -318,6 +417,32 @@ fn validate_programs(config: &toml::Value) {
     }
 }
 
+/// Position limits from a stepper configuration (Klipper-style)
+/// Only steppers support position control - DC/AC motors can only detect endstops.
+struct PositionLimits {
+    min: i64,
+    max: i64,
+}
+
+/// Get position limits from a stepper configuration
+/// Returns None if:
+/// - No stepper with that name exists
+/// - Stepper exists but has no position_max (not position-controlled)
+fn get_stepper_position_limits(config: &toml::Value, stepper_name: &str) -> Option<PositionLimits> {
+    let stepper = config
+        .get("stepper")
+        .and_then(|s| s.get(stepper_name))
+        .and_then(|s| s.as_table())?;
+
+    let min = stepper
+        .get("position_min")
+        .and_then(|v| v.as_integer())
+        .unwrap_or(0);
+    let max = stepper.get("position_max").and_then(|v| v.as_integer())?;
+
+    Some(PositionLimits { min, max })
+}
+
 /// Validate jar configurations
 fn validate_jars(config: &toml::Value) {
     let jars = match config.get("jar") {
@@ -331,6 +456,11 @@ fn validate_jars(config: &toml::Value) {
         .map(|t| t.keys().cloned().collect())
         .unwrap_or_default();
 
+    // Get position limits from stepper configurations (Klipper-style)
+    // Only steppers support position control for automated jar movement
+    let x_limits = get_stepper_position_limits(config, "x");
+    let z_limits = get_stepper_position_limits(config, "z");
+
     let mut errors = Vec::new();
 
     for (name, jar) in jars {
@@ -343,19 +473,39 @@ fn validate_jars(config: &toml::Value) {
         };
 
         // x_pos and z_pos are optional (for manual machines)
-        // but if present, must be valid numbers
+        // but if present, must be valid numbers (in mm)
         // Also accept legacy names tower_pos/lift_pos for backwards compatibility
         let x_pos = jar.get("x_pos").or_else(|| jar.get("tower_pos"));
         if let Some(toml::Value::Integer(pos)) = x_pos {
-            if *pos < 0 || *pos > 360 {
-                errors.push(format!("[jar.{}] x_pos must be 0-360", name));
+            // Validate against x motor's position limits if configured
+            if let Some(ref limits) = x_limits {
+                if *pos < limits.min || *pos > limits.max {
+                    errors.push(format!(
+                        "[jar.{}] x_pos {} outside stepper.x range ({}-{})",
+                        name, pos, limits.min, limits.max
+                    ));
+                }
+            }
+            // Basic sanity check if no motor configured
+            if x_limits.is_none() && (*pos < 0 || *pos > 100000) {
+                errors.push(format!("[jar.{}] x_pos {} seems unreasonable", name, pos));
             }
         }
 
         let z_pos = jar.get("z_pos").or_else(|| jar.get("lift_pos"));
         if let Some(toml::Value::Integer(pos)) = z_pos {
-            if *pos < 0 || *pos > 1000 {
-                errors.push(format!("[jar.{}] z_pos must be 0-1000", name));
+            // Validate against z motor's position limits if configured
+            if let Some(ref limits) = z_limits {
+                if *pos < limits.min || *pos > limits.max {
+                    errors.push(format!(
+                        "[jar.{}] z_pos {} outside stepper.z range ({}-{})",
+                        name, pos, limits.min, limits.max
+                    ));
+                }
+            }
+            // Basic sanity check if no motor configured
+            if z_limits.is_none() && (*pos < 0 || *pos > 10000) {
+                errors.push(format!("[jar.{}] z_pos {} seems unreasonable", name, pos));
             }
         }
 

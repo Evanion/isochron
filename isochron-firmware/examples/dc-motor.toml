@@ -2,6 +2,13 @@
 #
 # Example configuration for machines using DC motors.
 # Simpler and more affordable than stepper-based builds.
+#
+# DC motors are controlled via PWM through H-bridge or MOSFET drivers.
+# Speed is controlled as percentage (0-100%) rather than RPM.
+#
+# Usage:
+#   cp examples/dc-motor.toml machine.toml
+#   cargo build --release
 
 [machine]
 version = 1
@@ -10,45 +17,58 @@ motor_type = "dc"  # dc, ac, or stepper
 # =============================================================================
 # DC MOTORS
 # =============================================================================
-# DC motors are controlled via PWM through H-bridge or MOSFET drivers.
-# Each motor has enable (on/off), direction (for H-bridge), and PWM (speed).
+# Motor to board connector mapping (BTT SKR Pico):
+#   basket → E slot (GPIO 14, 13, 15)
+#   x      → X slot (GPIO 11, 10, 12)
+#   z      → Z slot (GPIO 19, 28, 2)
+#   lid    → Y slot (GPIO 6, 5, 7)
 
-[dc_motor.spin]
-pwm_pin = "gpio11"           # PWM speed control
-dir_pin = "gpio10"           # Direction (for H-bridge)
-enable_pin = "!gpio12"       # Enable (active low)
+[dc_motor.basket]
+pwm_pin = "gpio14"           # PWM speed control (E connector)
+dir_pin = "gpio13"           # Direction (for H-bridge)
+enable_pin = "!gpio15"       # Enable (active low)
 driver_type = "h_bridge"     # h_bridge, mosfet, or dual_mosfet
 pwm_frequency = 25000        # Hz
 min_duty = 20                # % minimum for motor to start
 soft_start_ms = 500          # ms to ramp up
 soft_stop_ms = 300           # ms to ramp down
 
-[dc_motor.lift]
-pwm_pin = "gpio6"
-dir_pin = "gpio5"
-enable_pin = "!gpio7"
-driver_type = "h_bridge"
-pwm_frequency = 25000
-min_duty = 30
-soft_start_ms = 200
-soft_stop_ms = 200
-# Limit switches for safety
-endstop_up = "^gpio4"
-endstop_down = "^gpio3"
+# Optional: Z axis (lift) - uncomment to enable
+# [dc_motor.z]
+# pwm_pin = "gpio19"           # Z connector
+# dir_pin = "gpio28"
+# enable_pin = "!gpio2"
+# driver_type = "h_bridge"
+# pwm_frequency = 25000
+# min_duty = 30
+# soft_start_ms = 200
+# soft_stop_ms = 200
+# # Limit switches for safety
+# endstop_up = "^gpio25"
+# endstop_down = "^gpio3"
+# # Position limits (Klipper-style)
+# position_min = 0             # mm
+# position_max = 150           # mm max travel
+# position_endstop = 0         # mm at endstop
 
-[dc_motor.tower]
-pwm_pin = "gpio19"
-dir_pin = "gpio28"
-enable_pin = "!gpio2"
-driver_type = "h_bridge"
-pwm_frequency = 25000
-min_duty = 25
-soft_start_ms = 300
-soft_stop_ms = 300
-endstop_home = "^gpio16"
+# Optional: X axis (carousel) - uncomment to enable
+# [dc_motor.x]
+# pwm_pin = "gpio11"           # X connector
+# dir_pin = "gpio10"
+# enable_pin = "!gpio12"
+# driver_type = "h_bridge"
+# pwm_frequency = 25000
+# min_duty = 25
+# soft_start_ms = 300
+# soft_stop_ms = 300
+# endstop_home = "^gpio4"
+# # Position limits (Klipper-style)
+# position_min = 0             # mm
+# position_max = 800           # mm (set based on your carousel size)
+# position_endstop = 0         # mm at endstop
 
 # =============================================================================
-# HEATERS (same as stepper config)
+# HEATERS
 # =============================================================================
 
 [heater.dryer]
@@ -60,24 +80,25 @@ max_temp = 55
 hysteresis = 2
 
 # =============================================================================
-# JARS (same as stepper config)
+# JARS
 # =============================================================================
+# x_pos/z_pos are in mm. For rotary carousels, x_pos is arc distance from home.
 
 [jar.clean]
-tower_pos = 0
-lift_pos = 120
+x_pos = 0
+z_pos = 120
 
 [jar.rinse1]
-tower_pos = 90
-lift_pos = 120
+x_pos = 200
+z_pos = 120
 
 [jar.rinse2]
-tower_pos = 180
-lift_pos = 120
+x_pos = 400
+z_pos = 120
 
 [jar.dry]
-tower_pos = 270
-lift_pos = 100
+x_pos = 600
+z_pos = 100
 heater = "dryer"
 
 # =============================================================================
@@ -108,7 +129,7 @@ iterations = 6
 temperature_c = 45
 
 # =============================================================================
-# PROGRAMS (same as stepper config)
+# PROGRAMS
 # =============================================================================
 
 [program.full_clean]
@@ -127,12 +148,18 @@ steps = [
     { jar = "rinse1", profile = "rinse" },
 ]
 
+[program.dry_only]
+label = "Dry Only"
+steps = [
+    { jar = "dry", profile = "dry" },
+]
+
 # =============================================================================
 # DISPLAY
 # =============================================================================
 
 [display]
-type = "direct_oled"         # I2C OLED on controller
-i2c_sda = "gpio0"
-i2c_scl = "gpio1"
-address = 0x3C
+type = "v0_display"
+uart_tx_pin = "gpio0"
+uart_rx_pin = "gpio1"
+baud = 115200

@@ -100,12 +100,30 @@ pub struct StepperHwConfig {
     pub full_steps_per_rotation: u16,
     /// Microsteps setting
     pub microsteps: u8,
-    /// Rotation distance (mm for linear, degrees for rotational)
+    /// Rotation distance in mm per motor rotation
+    /// For linear axes (z/lift): leadscrew pitch (e.g., 8mm for T8 leadscrew)
+    /// For rotary axes (x/carousel): arc circumference per rotation
+    /// For basket: typically 360 (treating degrees as mm for RPM calc)
     pub rotation_distance: u16,
     /// Gear ratio numerator (e.g., 3 for 3:1)
     pub gear_ratio_num: u8,
     /// Gear ratio denominator (e.g., 1 for 3:1)
     pub gear_ratio_den: u8,
+
+    // === Position control (Klipper-style) ===
+    /// Minimum valid position in mm (default: 0)
+    pub position_min: i32,
+    /// Maximum valid position in mm (required for position-controlled steppers)
+    pub position_max: Option<i32>,
+    /// Location of the endstop in mm (required if endstop_pin is set)
+    pub position_endstop: Option<i32>,
+    /// Homing speed in mm/s (default: 5)
+    pub homing_speed: Option<u16>,
+    /// Distance to retract after first endstop contact in mm (default: 5)
+    pub homing_retract_dist: Option<u16>,
+    /// If true, home in positive direction; if false, home toward zero
+    /// Default: auto-detected from position_endstop location
+    pub homing_positive_dir: Option<bool>,
 }
 
 /// TMC2209 driver configuration
@@ -176,6 +194,14 @@ pub struct DcMotorHwConfig {
     pub endstop_down: Option<PinConfig>,
     /// Home endstop (for x-axis/rotational)
     pub endstop_home: Option<PinConfig>,
+
+    // === Position control (Klipper-style) ===
+    /// Minimum valid position in mm (default: 0)
+    pub position_min: i32,
+    /// Maximum valid position in mm (required for position-controlled motors)
+    pub position_max: Option<i32>,
+    /// Location of the endstop in mm (required if endstop is set)
+    pub position_endstop: Option<i32>,
 }
 
 /// AC motor relay type
@@ -211,6 +237,14 @@ pub struct AcMotorHwConfig {
     pub endstop_down: Option<PinConfig>,
     /// Home endstop (for x-axis/rotational)
     pub endstop_home: Option<PinConfig>,
+
+    // === Position control (Klipper-style) ===
+    /// Minimum valid position in mm (default: 0)
+    pub position_min: i32,
+    /// Maximum valid position in mm (required for position-controlled motors)
+    pub position_max: Option<i32>,
+    /// Location of the endstop in mm (required if endstop is set)
+    pub position_endstop: Option<i32>,
 }
 
 /// Heater hardware configuration
@@ -267,6 +301,16 @@ pub struct MachineConfig {
     pub version: u8,
     /// Motor type for this machine
     pub motor_type: MotorType,
+
+    // === Motion Safety ===
+    /// Safe Z position for horizontal travel (mm)
+    /// The basket lifts to this height before moving between jars.
+    /// Should be high enough to clear jar rims and any obstructions.
+    /// Typically near stepper.z position_min (top of travel).
+    /// If not specified, defaults to stepper.z position_min.
+    pub safe_z: Option<i32>,
+
+    // === Hardware ===
     /// Stepper motor configurations (when motor_type = Stepper)
     pub steppers: Vec<StepperHwConfig, MAX_STEPPERS>,
     /// TMC2209 driver configurations (when motor_type = Stepper)
@@ -296,6 +340,7 @@ impl Default for MachineConfig {
         Self {
             version: 1,
             motor_type: MotorType::default(),
+            safe_z: None,
             steppers: Vec::new(),
             tmc2209s: Vec::new(),
             dc_motors: Vec::new(),

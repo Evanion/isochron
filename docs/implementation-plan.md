@@ -250,53 +250,58 @@ chronohub/cleaner/
 # RP2040 board, pins use gpio numbers
 
 # === STEPPERS (Klipper-style) ===
+# Motor to board connector mapping (BTT SKR Pico):
+#   basket → E slot (GPIO 14, 13, 15) - always required
+#   x      → X slot (GPIO 11, 10, 12) - jar selection (optional)
+#   z      → Z slot (GPIO 19, 28, 2)  - lift (optional)
+#   lid    → Y slot (GPIO 6, 5, 7)    - lid opener (optional)
 
-# Basket spin motor (rotates parts in solution) - always required
-[stepper spin]
-step_pin = "gpio11"
-dir_pin = "gpio10"
-enable_pin = "!gpio12"              # ! = active low
+# Basket motor (rotates parts in solution) - always required
+[stepper basket]
+step_pin = "gpio14"
+dir_pin = "gpio13"
+enable_pin = "!gpio15"              # ! = active low
 rotation_distance = 360             # degrees per motor rotation
 gear_ratio = "3:1"                  # 3:1 belt reduction
 full_steps_per_rotation = 200       # 1.8° motor (default)
 microsteps = 16
 
-[tmc2209 spin]
+[tmc2209 basket]
 uart_pin = "gpio9"
 tx_pin = "gpio8"
-uart_address = 0
+uart_address = 3                    # E slot is address 3
 run_current = 0.8
 stealthchop = true
 
-# Lift motor (raises/lowers basket) - optional
-# [stepper lift]
-# step_pin = "gpio6"
-# dir_pin = "gpio5"
-# enable_pin = "!gpio7"
+# Z motor (raises/lowers basket) - optional
+# [stepper z]
+# step_pin = "gpio19"
+# dir_pin = "gpio28"
+# enable_pin = "!gpio2"
 # rotation_distance = 8             # mm per leadscrew rotation
 # full_steps_per_rotation = 200
 # microsteps = 16
-# endstop_pin = "^gpio4"            # ^ = pull-up, physical endstop
+# endstop_pin = "^gpio25"           # ^ = pull-up, physical endstop
 # # OR use stallguard:
-# # endstop_pin = "tmc2209_lift:virtual_endstop"
+# # endstop_pin = "tmc2209_z:virtual_endstop"
 # position_endstop = 0              # mm at endstop
 # position_max = 150                # mm max travel
 # homing_speed = 10                 # mm/s
 
-# [tmc2209 lift]
-# uart_address = 1
-# diag_pin = "gpio3"                # For stallguard
+# [tmc2209 z]
+# uart_address = 2                  # Z slot is address 2
+# diag_pin = "gpio25"               # For stallguard
 # driver_sgthrs = 80                # Stallguard threshold
 
-# Position/rotation motor (rotates tower between jars) - optional
-# [stepper tower]
-# step_pin = "gpio19"
-# dir_pin = "gpio28"
-# enable_pin = "!gpio2"
+# X motor (jar selection/carousel rotation) - optional
+# [stepper x]
+# step_pin = "gpio11"
+# dir_pin = "gpio10"
+# enable_pin = "!gpio12"
 # rotation_distance = 360           # degrees per motor rotation
-# gear_ratio = "5:1"                # Tower gearbox
+# gear_ratio = "5:1"                # Carousel gearbox
 # microsteps = 16
-# endstop_pin = "^gpio16"           # Home switch
+# endstop_pin = "^gpio4"            # Home switch
 # # OR: endstop_pin = "tmc2209_tower:virtual_endstop"
 # position_endstop = 0              # degrees at home
 # position_max = 360                # degrees (full rotation)
@@ -318,28 +323,28 @@ max_temp = 55
 hysteresis = 2
 
 # === JARS (define physical jar positions) ===
-# Positions are coordinates from endstop after homing
-# - For tower rotation: degrees from home
-# - For linear position: mm from home
-# - For lift: mm down from top
+# All positions are in mm from home position after homing
+# - x_pos: For rotary carousels, arc distance from home
+#          For linear machines, linear distance from home
+# - z_pos: mm down from top
 
 [jar clean]
-tower_pos = 0                       # degrees from home (first jar at home)
-lift_pos = 120                      # mm down (lowered into jar)
+x_pos = 0                           # mm from home (first jar at home)
+z_pos = 120                         # mm down (lowered into jar)
 # heater = "jar_clean"              # Optional per-jar heater
 # ultrasonic = "us_clean"           # Optional ultrasonic module
 
 [jar rinse1]
-tower_pos = 90                      # 90 degrees rotation
-lift_pos = 120
+x_pos = 200                         # mm arc distance (for rotary) or linear
+z_pos = 120
 
 [jar rinse2]
-tower_pos = 180                     # 180 degrees rotation
-lift_pos = 120
+x_pos = 400                         # mm
+z_pos = 120
 
 [jar dry]
-tower_pos = 270                     # 270 degrees rotation
-lift_pos = 100                      # Shallower for drying chamber
+x_pos = 600                         # mm
+z_pos = 100                         # Shallower for drying chamber
 heater = "dryer"                    # Drying chamber heater
 
 # === ACCESSORIES ===
@@ -607,17 +612,23 @@ Key invariants from brief:
 
 The firmware ships with a default `machine.toml` for SKR Pico. Users can modify for other RP2040 boards.
 
-**Reference pin assignments (Stepper X slot):**
+**Motor-to-connector mapping (see `docs/Boards.md` for full pinout):**
+
+| Motor | Connector | STEP | DIR | EN | TMC ADDR |
+|-------|-----------|------|-----|-----|----------|
+| basket | E | GPIO14 | GPIO13 | GPIO15 | 3 |
+| x | X | GPIO11 | GPIO10 | GPIO12 | 0 |
+| z | Z | GPIO19 | GPIO28 | GPIO2 | 2 |
+| lid | Y | GPIO6 | GPIO5 | GPIO7 | 1 |
+
+**Peripherals:**
 
 | Function | GPIO | Notes |
 |----------|------|-------|
-| STEP | GPIO11 | Stepper X step |
-| DIR | GPIO10 | Stepper X direction |
-| ENABLE | GPIO12 | Stepper X enable (active low) |
-| TMC UART TX | GPIO9 | Shared TMC bus |
-| TMC UART RX | GPIO8 | Shared TMC bus, address 0 |
-| Heater | GPIO23 | HE0 (hotend heater output) |
-| Thermistor | GPIO27 | TH0 (hotend thermistor, ADC) |
+| TMC UART TX | GPIO8 | Shared TMC bus |
+| TMC UART RX | GPIO9 | Shared TMC bus |
+| Heater | GPIO23 | HE0 (dryer heater output) |
+| Thermistor | GPIO27 | TH0 (dryer thermistor, ADC) |
 | Display UART TX | GPIO0 | UART0 TX (dedicated UART connector) |
 | Display UART RX | GPIO1 | UART0 RX (dedicated UART connector) |
 

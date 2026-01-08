@@ -6,11 +6,45 @@ This document describes the available configuration sections and parameters for 
 
 Isochron uses a hierarchical configuration with these main sections:
 
+- **Machine section**: `[machine]` - global settings
 - **Hardware sections**: `[stepper]`, `[tmc2209]`, `[heater]`, `[display]`
 - **Machine sections**: `[jar]`, `[profile]`, `[program]`
 - **UI sections**: `[ui]`
 
 Parameters shown with `#` prefix are optional with default values. Parameters without `#` are required.
+
+---
+
+## Machine Configuration
+
+### [machine]
+
+Global machine settings.
+
+```toml
+[machine]
+version = 1
+#   Configuration version. Must be 1 for current firmware.
+#   Used for future backwards compatibility.
+
+#safe_z = 5
+#   Safe Z position for horizontal travel between jars (mm).
+#   The basket lifts to this height before moving to the next jar.
+#   Should be high enough to clear jar rims and any obstructions.
+#   Typically near stepper.z position_min (top of travel).
+#   If not specified, defaults to stepper.z position_min.
+#   Only used on automated machines with z stepper.
+```
+
+#### Transfer Sequence
+
+When moving between jars on automated machines, the firmware executes:
+
+1. **Lift**: Move Z to `safe_z` position (clears jar rim)
+2. **Travel**: Move X to target jar's `x_pos`
+3. **Lower**: Move Z to target jar's `z_pos`
+
+This prevents collisions with jar rims during horizontal travel.
 
 ---
 
@@ -22,15 +56,18 @@ Defines a stepper motor. The `name` identifies this stepper (e.g., `basket`, `z`
 
 ```toml
 [stepper basket]
-step_pin = "gpio11"
+step_pin = "gpio14"
 #   The GPIO pin for step pulses. This parameter must be provided.
+#   For BTT SKR Pico: basket motor uses E connector (GPIO14).
 
-dir_pin = "gpio10"
+dir_pin = "gpio13"
 #   The GPIO pin for direction control. This parameter must be provided.
+#   For BTT SKR Pico: basket motor uses E connector (GPIO13).
 
-enable_pin = "!gpio12"
+enable_pin = "!gpio15"
 #   The GPIO pin for motor enable. Prefix with ! for active-low (inverted).
 #   This parameter must be provided.
+#   For BTT SKR Pico: basket motor uses E connector (GPIO15).
 
 #endstop_pin = "^gpio4"
 #   The GPIO pin for the endstop switch. Prefix with ^ for pull-up.
@@ -46,15 +83,50 @@ enable_pin = "!gpio12"
 #   8, 16, 32, or 64. The default is 16.
 
 #rotation_distance = 360
-#   The distance traveled (in mm or degrees) per full motor rotation.
-#   For the basket motor, this is typically 360 (degrees).
-#   For linear axes, this is the leadscrew pitch (mm).
+#   The distance traveled (in mm) per full motor rotation.
+#   For the basket motor, this is typically 360 (treating degrees as mm).
+#   For linear axes (z), this is the leadscrew pitch (e.g., 8mm for T8).
+#   For rotary axes (x), this is the arc distance per rotation.
 #   The default is 360.
 
 #gear_ratio = "3:1"
 #   The gear ratio between motor and output. Format is "driven:driving".
 #   For example, "3:1" means motor turns 3 times for 1 output rotation.
 #   The default is "1:1" (direct drive).
+
+# === Position Control (Klipper-style) ===
+# These parameters define the valid travel range for position-controlled
+# steppers (x and z axes). The firmware validates jar positions against
+# these limits at build time.
+
+#position_min = 0
+#   Minimum valid position in mm. Movements below this are rejected.
+#   The default is 0.
+
+#position_max = 150
+#   Maximum valid position in mm. Required for position-controlled steppers.
+#   Movements above this are rejected. Set based on your machine's physical
+#   travel (e.g., leadscrew length for z, carousel arc distance for x).
+
+#position_endstop = 0
+#   Location of the endstop in mm. Required if endstop_pin is set.
+#   After homing, the axis position is set to this value.
+#   If near position_min, homing moves toward zero (negative direction).
+#   If near position_max, homing moves away from zero (positive direction).
+
+#homing_speed = 10
+#   Homing speed in mm/s. The default is 5.
+
+#homing_retract_dist = 5
+#   Distance in mm to retract after first endstop contact before
+#   performing the second (slower) homing pass. Set to 0 to disable
+#   the second pass. The default is 5.
+
+#homing_positive_dir = false
+#   If true, home in positive direction (away from zero).
+#   If false, home toward zero. The default is auto-detected from
+#   position_endstop: true if near position_max, false if near position_min.
+#   It is better to use the default than to specify this parameter.
 ```
 
 #### Pin Syntax
@@ -72,14 +144,14 @@ Pins can be specified with modifiers:
 
 Reserved stepper names with special behavior:
 
-| Name | Purpose | Required |
-|------|---------|----------|
-| `basket` | Basket rotation motor | Yes |
-| `z` | Basket vertical movement (lift) | Optional |
-| `x` | Basket horizontal positioning (jar selection) | Optional |
-| `lid` | Jar lid opener | Optional |
+| Name | Purpose | Required | Position Control |
+|------|---------|----------|------------------|
+| `basket` | Basket rotation motor | Yes | No (RPM only) |
+| `z` | Basket vertical movement (lift) | Optional | Yes (needs position_max) |
+| `x` | Basket horizontal positioning (jar selection) | Optional | Yes (needs position_max) |
+| `lid` | Jar lid opener | Optional | Optional |
 
-**Note:** A machine with both `z` and `x` steppers is considered "automated" - the firmware controls basket movement between jars.
+**Automated Machines:** A machine with both `z` and `x` steppers is considered "automated" - the firmware controls basket movement between jars. These steppers require `position_min`, `position_max`, `position_endstop`, and `endstop_pin` for proper operation.
 
 ---
 
@@ -348,11 +420,13 @@ Set the motor type at the top of your configuration:
 motor_type = "stepper"  # Options: "stepper", "dc", "ac"
 ```
 
-| Type | Driver Section | Speed Control |
-|------|----------------|---------------|
-| `stepper` | `[stepper]` + `[tmc2209]` | Precise RPM via microstepping |
-| `dc` | `[dc_motor]` | PWM duty cycle (0-100%) |
-| `ac` | `[ac_motor]` | On/off only |
+| Type | Driver Section | Speed Control | Position Control |
+|------|----------------|---------------|------------------|
+| `stepper` | `[stepper]` + `[tmc2209]` | Precise RPM via microstepping | Yes (homing + positioning) |
+| `dc` | `[dc_motor]` | PWM duty cycle (0-100%) | No (endstop-only) |
+| `ac` | `[ac_motor]` | On/off only | No (endstop-only) |
+
+**Position Control:** Only stepper motors support accurate positioning for automated jar selection. DC and AC motors can detect endstops for safety limits but cannot perform precise movements between jars. Automated machines (with x and z axes) require stepper motors.
 
 ---
 
@@ -392,7 +466,9 @@ Defines a jar (cleaning station) in the machine.
 #   Define jar named "clean".
 
 #x_pos = 0
-#   Position in degrees from home for the x motor (jar selection).
+#   Position in mm from home for the x motor (jar selection).
+#   For rotary carousels: arc distance from home position.
+#   For linear machines: linear distance from home.
 #   Only used on automated machines with x stepper.
 #   The default is 0.
 
@@ -560,9 +636,9 @@ Here's a complete configuration for a manual 4-jar watch cleaning machine:
 # === STEPPERS ===
 
 [stepper basket]
-step_pin = "gpio11"
-dir_pin = "gpio10"
-enable_pin = "!gpio12"
+step_pin = "gpio14"
+dir_pin = "gpio13"
+enable_pin = "!gpio15"
 full_steps_per_rotation = 200
 microsteps = 16
 rotation_distance = 360
@@ -571,11 +647,10 @@ gear_ratio = "3:1"
 [tmc2209 basket]
 uart_tx_pin = "gpio8"
 uart_rx_pin = "gpio9"
-uart_address = 0
+uart_address = 3                # E slot is address 3
 run_current = 0.8
 hold_current = 0.4
 stealthchop = true
-diag_pin = "gpio17"
 
 # === HEATERS ===
 

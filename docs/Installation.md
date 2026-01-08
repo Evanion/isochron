@@ -201,11 +201,11 @@ The firmware comes with a default configuration for a basic manual cleaning mach
 
 The default config provides:
 
-- **Spin motor** on Stepper X slot (GPIO 10, 11, 12)
+- **Basket motor** on Stepper E slot (GPIO 14, 13, 15)
 - **Dryer heater** on HE0 (GPIO 23) with thermistor on TH0 (GPIO 27)
-- **Three jars**: clean, rinse, dry
+- **Four jars**: clean, rinse1, rinse2, dry
 - **Three profiles**: Clean (3 min), Rinse (2 min), Dry (10 min)
-- **Two programs**: Full Clean, Quick Clean
+- **Three programs**: Full Clean, Quick Clean, Dry Only
 
 ### Creating a Custom Config
 

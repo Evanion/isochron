@@ -194,9 +194,9 @@ Use the `pico-ac-motor` profile for AC motor builds.
 motor_type = "dc"
 
 [dc_motor.basket]
-pwm_pin = "gpio11"
-dir_pin = "gpio10"
-enable_pin = "!gpio12"
+pwm_pin = "gpio14"        # E connector on BTT SKR Pico
+dir_pin = "gpio13"
+enable_pin = "!gpio15"
 driver_type = "h_bridge"
 pwm_frequency = 25000
 min_duty = 20
@@ -211,8 +211,8 @@ soft_stop_ms = 300
 motor_type = "ac"
 
 [ac_motor.basket]
-enable_pin = "gpio11"
-direction_pin = "gpio10"  # Optional
+enable_pin = "gpio14"         # E connector on BTT SKR Pico
+direction_pin = "gpio13"      # Optional
 relay_type = "ssr"
 active_high = true
 
