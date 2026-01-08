@@ -46,6 +46,10 @@ soft_stop_ms = 300           # ms to ramp down
 # # Limit switches for safety
 # endstop_up = "^gpio25"
 # endstop_down = "^gpio3"
+# # Position limits (Klipper-style)
+# position_min = 0             # mm
+# position_max = 150           # mm max travel
+# position_endstop = 0         # mm at endstop
 
 # Optional: X axis (carousel) - uncomment to enable
 # [dc_motor.x]
@@ -58,6 +62,10 @@ soft_stop_ms = 300           # ms to ramp down
 # soft_start_ms = 300
 # soft_stop_ms = 300
 # endstop_home = "^gpio4"
+# # Position limits (Klipper-style)
+# position_min = 0             # mm
+# position_max = 800           # mm (set based on your carousel size)
+# position_endstop = 0         # mm at endstop
 
 # =============================================================================
 # HEATERS

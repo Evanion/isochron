@@ -54,14 +54,15 @@ stallguard_threshold = 80
 # step_pin = "gpio11"
 # dir_pin = "gpio10"
 # enable_pin = "!gpio12"
-# rotation_distance = 360           # degrees per motor rotation
+# rotation_distance = 200           # mm arc distance per motor rotation
 # gear_ratio = "5:1"
 # full_steps_per_rotation = 200
 # microsteps = 16
-# endstop_pin = "^gpio4"            # X endstop
-# position_endstop = 0              # degrees at home
-# position_max = 360                # degrees (full rotation)
-# homing_speed = 30                 # deg/s
+# endstop_pin = "^gpio4"            # X endstop (homes to position_min)
+# position_min = 0                  # mm (Klipper-style)
+# position_max = 800                # mm (set based on your carousel size)
+# position_endstop = 0              # mm at endstop
+# homing_speed = 30                 # mm/s
 #
 # [tmc2209.x]
 # uart_address = 0                  # X driver is address 0
@@ -80,9 +81,10 @@ stallguard_threshold = 80
 # rotation_distance = 8             # mm per leadscrew rotation
 # full_steps_per_rotation = 200
 # microsteps = 16
-# endstop_pin = "^gpio25"           # Z endstop
-# position_endstop = 0              # mm at endstop
+# endstop_pin = "^gpio25"           # Z endstop (homes to position_min)
+# position_min = 0                  # mm (Klipper-style)
 # position_max = 150                # mm max travel
+# position_endstop = 0              # mm at endstop
 # homing_speed = 10                 # mm/s
 #
 # [tmc2209.z]

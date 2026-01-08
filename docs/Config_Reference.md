@@ -49,15 +49,50 @@ enable_pin = "!gpio15"
 #   8, 16, 32, or 64. The default is 16.
 
 #rotation_distance = 360
-#   The distance traveled (in mm or degrees) per full motor rotation.
-#   For the basket motor, this is typically 360 (degrees).
-#   For linear axes, this is the leadscrew pitch (mm).
+#   The distance traveled (in mm) per full motor rotation.
+#   For the basket motor, this is typically 360 (treating degrees as mm).
+#   For linear axes (z), this is the leadscrew pitch (e.g., 8mm for T8).
+#   For rotary axes (x), this is the arc distance per rotation.
 #   The default is 360.
 
 #gear_ratio = "3:1"
 #   The gear ratio between motor and output. Format is "driven:driving".
 #   For example, "3:1" means motor turns 3 times for 1 output rotation.
 #   The default is "1:1" (direct drive).
+
+# === Position Control (Klipper-style) ===
+# These parameters define the valid travel range for position-controlled
+# steppers (x and z axes). The firmware validates jar positions against
+# these limits at build time.
+
+#position_min = 0
+#   Minimum valid position in mm. Movements below this are rejected.
+#   The default is 0.
+
+#position_max = 150
+#   Maximum valid position in mm. Required for position-controlled steppers.
+#   Movements above this are rejected. Set based on your machine's physical
+#   travel (e.g., leadscrew length for z, carousel arc distance for x).
+
+#position_endstop = 0
+#   Location of the endstop in mm. Required if endstop_pin is set.
+#   After homing, the axis position is set to this value.
+#   If near position_min, homing moves toward zero (negative direction).
+#   If near position_max, homing moves away from zero (positive direction).
+
+#homing_speed = 10
+#   Homing speed in mm/s. The default is 5.
+
+#homing_retract_dist = 5
+#   Distance in mm to retract after first endstop contact before
+#   performing the second (slower) homing pass. Set to 0 to disable
+#   the second pass. The default is 5.
+
+#homing_positive_dir = false
+#   If true, home in positive direction (away from zero).
+#   If false, home toward zero. The default is auto-detected from
+#   position_endstop: true if near position_max, false if near position_min.
+#   It is better to use the default than to specify this parameter.
 ```
 
 #### Pin Syntax
@@ -75,14 +110,14 @@ Pins can be specified with modifiers:
 
 Reserved stepper names with special behavior:
 
-| Name | Purpose | Required |
-|------|---------|----------|
-| `basket` | Basket rotation motor | Yes |
-| `z` | Basket vertical movement (lift) | Optional |
-| `x` | Basket horizontal positioning (jar selection) | Optional |
-| `lid` | Jar lid opener | Optional |
+| Name | Purpose | Required | Position Control |
+|------|---------|----------|------------------|
+| `basket` | Basket rotation motor | Yes | No (RPM only) |
+| `z` | Basket vertical movement (lift) | Optional | Yes (needs position_max) |
+| `x` | Basket horizontal positioning (jar selection) | Optional | Yes (needs position_max) |
+| `lid` | Jar lid opener | Optional | Optional |
 
-**Note:** A machine with both `z` and `x` steppers is considered "automated" - the firmware controls basket movement between jars.
+**Automated Machines:** A machine with both `z` and `x` steppers is considered "automated" - the firmware controls basket movement between jars. These steppers require `position_min`, `position_max`, `position_endstop`, and `endstop_pin` for proper operation.
 
 ---
 
@@ -351,11 +386,13 @@ Set the motor type at the top of your configuration:
 motor_type = "stepper"  # Options: "stepper", "dc", "ac"
 ```
 
-| Type | Driver Section | Speed Control |
-|------|----------------|---------------|
-| `stepper` | `[stepper]` + `[tmc2209]` | Precise RPM via microstepping |
-| `dc` | `[dc_motor]` | PWM duty cycle (0-100%) |
-| `ac` | `[ac_motor]` | On/off only |
+| Type | Driver Section | Speed Control | Position Control |
+|------|----------------|---------------|------------------|
+| `stepper` | `[stepper]` + `[tmc2209]` | Precise RPM via microstepping | Yes (homing + positioning) |
+| `dc` | `[dc_motor]` | PWM duty cycle (0-100%) | No (endstop-only) |
+| `ac` | `[ac_motor]` | On/off only | No (endstop-only) |
+
+**Position Control:** Only stepper motors support accurate positioning for automated jar selection. DC and AC motors can detect endstops for safety limits but cannot perform precise movements between jars. Automated machines (with x and z axes) require stepper motors.
 
 ---
 

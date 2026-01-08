@@ -318,6 +318,32 @@ fn validate_programs(config: &toml::Value) {
     }
 }
 
+/// Position limits from a stepper configuration (Klipper-style)
+/// Only steppers support position control - DC/AC motors can only detect endstops.
+struct PositionLimits {
+    min: i64,
+    max: i64,
+}
+
+/// Get position limits from a stepper configuration
+/// Returns None if:
+/// - No stepper with that name exists
+/// - Stepper exists but has no position_max (not position-controlled)
+fn get_stepper_position_limits(config: &toml::Value, stepper_name: &str) -> Option<PositionLimits> {
+    let stepper = config
+        .get("stepper")
+        .and_then(|s| s.get(stepper_name))
+        .and_then(|s| s.as_table())?;
+
+    let min = stepper
+        .get("position_min")
+        .and_then(|v| v.as_integer())
+        .unwrap_or(0);
+    let max = stepper.get("position_max").and_then(|v| v.as_integer())?;
+
+    Some(PositionLimits { min, max })
+}
+
 /// Validate jar configurations
 fn validate_jars(config: &toml::Value) {
     let jars = match config.get("jar") {
@@ -330,6 +356,11 @@ fn validate_jars(config: &toml::Value) {
         .and_then(|h| h.as_table())
         .map(|t| t.keys().cloned().collect())
         .unwrap_or_default();
+
+    // Get position limits from stepper configurations (Klipper-style)
+    // Only steppers support position control for automated jar movement
+    let x_limits = get_stepper_position_limits(config, "x");
+    let z_limits = get_stepper_position_limits(config, "z");
 
     let mut errors = Vec::new();
 
@@ -347,15 +378,35 @@ fn validate_jars(config: &toml::Value) {
         // Also accept legacy names tower_pos/lift_pos for backwards compatibility
         let x_pos = jar.get("x_pos").or_else(|| jar.get("tower_pos"));
         if let Some(toml::Value::Integer(pos)) = x_pos {
-            if *pos < 0 || *pos > 10000 {
-                errors.push(format!("[jar.{}] x_pos must be 0-10000 mm", name));
+            // Validate against x motor's position limits if configured
+            if let Some(ref limits) = x_limits {
+                if *pos < limits.min || *pos > limits.max {
+                    errors.push(format!(
+                        "[jar.{}] x_pos {} outside stepper.x range ({}-{})",
+                        name, pos, limits.min, limits.max
+                    ));
+                }
+            }
+            // Basic sanity check if no motor configured
+            if x_limits.is_none() && (*pos < 0 || *pos > 100000) {
+                errors.push(format!("[jar.{}] x_pos {} seems unreasonable", name, pos));
             }
         }
 
         let z_pos = jar.get("z_pos").or_else(|| jar.get("lift_pos"));
         if let Some(toml::Value::Integer(pos)) = z_pos {
-            if *pos < 0 || *pos > 1000 {
-                errors.push(format!("[jar.{}] z_pos must be 0-1000 mm", name));
+            // Validate against z motor's position limits if configured
+            if let Some(ref limits) = z_limits {
+                if *pos < limits.min || *pos > limits.max {
+                    errors.push(format!(
+                        "[jar.{}] z_pos {} outside stepper.z range ({}-{})",
+                        name, pos, limits.min, limits.max
+                    ));
+                }
+            }
+            // Basic sanity check if no motor configured
+            if z_limits.is_none() && (*pos < 0 || *pos > 10000) {
+                errors.push(format!("[jar.{}] z_pos {} seems unreasonable", name, pos));
             }
         }
 

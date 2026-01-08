@@ -45,26 +45,28 @@ stealthchop = true
 # step_pin = "gpio?"
 # dir_pin = "gpio?"
 # enable_pin = "!gpio?"
-# rotation_distance = 360
+# rotation_distance = 200        # mm arc distance per motor rotation
 # gear_ratio = "1:1"
 # full_steps_per_rotation = 200
 # microsteps = 16
 # endstop_pin = "^gpio?"
-# position_endstop = 0
-# position_max = 360
-# homing_speed = 30
+# position_min = 0               # mm (Klipper-style)
+# position_max = 800             # mm (set based on your carousel size)
+# position_endstop = 0           # mm at endstop
+# homing_speed = 30              # mm/s
 
 # [stepper.z]
 # step_pin = "gpio?"
 # dir_pin = "gpio?"
 # enable_pin = "!gpio?"
-# rotation_distance = 8        # mm per leadscrew rotation
+# rotation_distance = 8          # mm per leadscrew rotation
 # full_steps_per_rotation = 200
 # microsteps = 16
 # endstop_pin = "^gpio?"
-# position_endstop = 0
-# position_max = 150
-# homing_speed = 10
+# position_min = 0               # mm (Klipper-style)
+# position_max = 150             # mm max travel
+# position_endstop = 0           # mm at endstop
+# homing_speed = 10              # mm/s
 
 # =============================================================================
 # HEATERS

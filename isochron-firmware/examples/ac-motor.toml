@@ -40,6 +40,10 @@ active_high = true              # Relay activation polarity
 # # Limit switches for safety
 # endstop_up = "^gpio25"
 # endstop_down = "^gpio3"
+# # Position limits (Klipper-style)
+# position_min = 0               # mm
+# position_max = 150             # mm max travel
+# position_endstop = 0           # mm at endstop
 
 # Optional: X axis (carousel) - uncomment to enable
 # [ac_motor.x]
@@ -48,6 +52,10 @@ active_high = true              # Relay activation polarity
 # relay_type = "ssr"
 # active_high = true
 # endstop_home = "^gpio4"
+# # Position limits (Klipper-style)
+# position_min = 0               # mm
+# position_max = 800             # mm (set based on your carousel size)
+# position_endstop = 0           # mm at endstop
 
 # =============================================================================
 # SAFETY SETTINGS

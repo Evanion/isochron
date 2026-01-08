@@ -109,6 +109,22 @@ pub struct StepperHwConfig {
     pub gear_ratio_num: u8,
     /// Gear ratio denominator (e.g., 1 for 3:1)
     pub gear_ratio_den: u8,
+
+    // === Position control (Klipper-style) ===
+
+    /// Minimum valid position in mm (default: 0)
+    pub position_min: i32,
+    /// Maximum valid position in mm (required for position-controlled steppers)
+    pub position_max: Option<i32>,
+    /// Location of the endstop in mm (required if endstop_pin is set)
+    pub position_endstop: Option<i32>,
+    /// Homing speed in mm/s (default: 5)
+    pub homing_speed: Option<u16>,
+    /// Distance to retract after first endstop contact in mm (default: 5)
+    pub homing_retract_dist: Option<u16>,
+    /// If true, home in positive direction; if false, home toward zero
+    /// Default: auto-detected from position_endstop location
+    pub homing_positive_dir: Option<bool>,
 }
 
 /// TMC2209 driver configuration
@@ -179,6 +195,15 @@ pub struct DcMotorHwConfig {
     pub endstop_down: Option<PinConfig>,
     /// Home endstop (for x-axis/rotational)
     pub endstop_home: Option<PinConfig>,
+
+    // === Position control (Klipper-style) ===
+
+    /// Minimum valid position in mm (default: 0)
+    pub position_min: i32,
+    /// Maximum valid position in mm (required for position-controlled motors)
+    pub position_max: Option<i32>,
+    /// Location of the endstop in mm (required if endstop is set)
+    pub position_endstop: Option<i32>,
 }
 
 /// AC motor relay type
@@ -214,6 +239,15 @@ pub struct AcMotorHwConfig {
     pub endstop_down: Option<PinConfig>,
     /// Home endstop (for x-axis/rotational)
     pub endstop_home: Option<PinConfig>,
+
+    // === Position control (Klipper-style) ===
+
+    /// Minimum valid position in mm (default: 0)
+    pub position_min: i32,
+    /// Maximum valid position in mm (required for position-controlled motors)
+    pub position_max: Option<i32>,
+    /// Location of the endstop in mm (required if endstop is set)
+    pub position_endstop: Option<i32>,
 }
 
 /// Heater hardware configuration
