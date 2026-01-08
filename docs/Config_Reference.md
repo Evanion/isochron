@@ -77,7 +77,7 @@ Reserved stepper names with special behavior:
 | `basket` | Basket rotation motor | Yes |
 | `z` | Basket vertical movement (lift) | Optional |
 | `x` | Basket horizontal positioning (jar selection) | Optional |
-| `lid` | Drying chamber lid | Optional |
+| `lid` | Jar lid opener | Optional |
 
 **Note:** A machine with both `z` and `x` steppers is considered "automated" - the firmware controls basket movement between jars.
 
