@@ -9,15 +9,35 @@ use heapless::{String, Vec};
 use serde::{Deserialize, Serialize};
 
 use super::types::{
-    HeaterConfig, JarConfig, ProfileConfig, ProgramConfig, UiConfig,
-    MAX_JARS, MAX_LABEL_LEN, MAX_PROFILES, MAX_PROGRAMS,
+    HeaterConfig, JarConfig, ProfileConfig, ProgramConfig, UiConfig, MAX_JARS, MAX_LABEL_LEN,
+    MAX_PROFILES, MAX_PROGRAMS,
 };
 
 /// Maximum steppers per config
 pub const MAX_STEPPERS: usize = 4;
 
-/// Maximum heaters per config  
+/// Maximum DC motors per config
+pub const MAX_DC_MOTORS: usize = 4;
+
+/// Maximum AC motors per config
+pub const MAX_AC_MOTORS: usize = 4;
+
+/// Maximum heaters per config
 pub const MAX_HEATERS: usize = 4;
+
+/// Motor type for the machine
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum MotorType {
+    /// Stepper motors with TMC drivers
+    #[default]
+    Stepper,
+    /// DC motors with PWM control
+    Dc,
+    /// AC motors with relay control
+    Ac,
+}
 
 /// Pin configuration with optional inversion
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -113,6 +133,86 @@ pub struct Tmc2209HwConfig {
     pub diag_pin: Option<u8>,
 }
 
+/// DC motor driver type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum DcDriverType {
+    /// H-bridge driver (L298N, TB6612, etc.) - supports direction control
+    #[default]
+    HBridge,
+    /// Single MOSFET driver - only supports one direction
+    Mosfet,
+    /// Dual MOSFET driver - supports direction control
+    DualMosfet,
+}
+
+/// DC motor hardware configuration
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct DcMotorHwConfig {
+    /// Motor name (e.g., "spin", "lift", "tower")
+    pub name: String<MAX_LABEL_LEN>,
+    /// PWM output pin for speed control
+    pub pwm_pin: PinConfig,
+    /// Direction pin (for H-bridge or dual MOSFET)
+    pub dir_pin: Option<PinConfig>,
+    /// Enable pin (optional, for H-bridge drivers)
+    pub enable_pin: Option<PinConfig>,
+    /// Driver type
+    pub driver_type: DcDriverType,
+    /// PWM frequency in Hz (typical: 25000)
+    pub pwm_frequency: u32,
+    /// Minimum duty cycle percentage (below this the motor won't start)
+    pub min_duty: u8,
+    /// Soft start ramp time in ms
+    pub soft_start_ms: u16,
+    /// Soft stop ramp time in ms
+    pub soft_stop_ms: u16,
+    /// Endstop pin (optional, for position-controlled motors)
+    pub endstop_up: Option<PinConfig>,
+    /// Second endstop pin (for bi-directional position control)
+    pub endstop_down: Option<PinConfig>,
+    /// Home endstop (for tower/rotational)
+    pub endstop_home: Option<PinConfig>,
+}
+
+/// AC motor relay type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub enum AcRelayType {
+    /// Mechanical relay - slower switching, requires debounce
+    #[default]
+    Mechanical,
+    /// Solid State Relay (SSR) - fast switching, no debounce
+    Ssr,
+}
+
+/// AC motor hardware configuration
+#[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct AcMotorHwConfig {
+    /// Motor name (e.g., "spin", "lift", "tower")
+    pub name: String<MAX_LABEL_LEN>,
+    /// Relay enable pin (controls motor on/off)
+    pub enable_pin: PinConfig,
+    /// Direction pin (for reversible motors)
+    pub direction_pin: Option<PinConfig>,
+    /// Relay type
+    pub relay_type: AcRelayType,
+    /// Relay is active-high (true) or active-low (false)
+    pub active_high: bool,
+    /// Endstop pin (optional, for position-controlled motors)
+    pub endstop_up: Option<PinConfig>,
+    /// Second endstop pin (for bi-directional position control)
+    pub endstop_down: Option<PinConfig>,
+    /// Home endstop (for tower/rotational)
+    pub endstop_home: Option<PinConfig>,
+}
+
 /// Heater hardware configuration
 #[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -165,10 +265,16 @@ pub struct DisplayHwConfig {
 pub struct MachineConfig {
     /// Configuration version for compatibility checks
     pub version: u8,
-    /// Stepper motor configurations
+    /// Motor type for this machine
+    pub motor_type: MotorType,
+    /// Stepper motor configurations (when motor_type = Stepper)
     pub steppers: Vec<StepperHwConfig, MAX_STEPPERS>,
-    /// TMC2209 driver configurations
+    /// TMC2209 driver configurations (when motor_type = Stepper)
     pub tmc2209s: Vec<Tmc2209HwConfig, MAX_STEPPERS>,
+    /// DC motor configurations (when motor_type = Dc)
+    pub dc_motors: Vec<DcMotorHwConfig, MAX_DC_MOTORS>,
+    /// AC motor configurations (when motor_type = Ac)
+    pub ac_motors: Vec<AcMotorHwConfig, MAX_AC_MOTORS>,
     /// Heater hardware configurations
     pub heater_hw: Vec<HeaterHwConfig, MAX_HEATERS>,
     /// Heater control configurations
@@ -189,8 +295,11 @@ impl Default for MachineConfig {
     fn default() -> Self {
         Self {
             version: 1,
+            motor_type: MotorType::default(),
             steppers: Vec::new(),
             tmc2209s: Vec::new(),
+            dc_motors: Vec::new(),
+            ac_motors: Vec::new(),
             heater_hw: Vec::new(),
             heaters: Vec::new(),
             jars: Vec::new(),
@@ -213,6 +322,16 @@ impl MachineConfig {
         self.steppers.iter().find(|s| s.name.as_str() == name)
     }
 
+    /// Find a DC motor by name
+    pub fn find_dc_motor(&self, name: &str) -> Option<&DcMotorHwConfig> {
+        self.dc_motors.iter().find(|m| m.name.as_str() == name)
+    }
+
+    /// Find an AC motor by name
+    pub fn find_ac_motor(&self, name: &str) -> Option<&AcMotorHwConfig> {
+        self.ac_motors.iter().find(|m| m.name.as_str() == name)
+    }
+
     /// Find a heater by name
     pub fn find_heater(&self, name: &str) -> Option<&HeaterConfig> {
         self.heaters.iter().find(|h| h.name.as_str() == name)
@@ -233,14 +352,43 @@ impl MachineConfig {
         self.programs.iter().find(|p| p.label.as_str() == name)
     }
 
-    /// Check if this is an automated machine (has lift and tower steppers)
+    /// Check if this is an automated machine (has lift and tower motors)
     pub fn is_automated(&self) -> bool {
-        self.find_stepper("lift").is_some() && self.find_stepper("tower").is_some()
+        match self.motor_type {
+            MotorType::Stepper => {
+                self.find_stepper("lift").is_some() && self.find_stepper("tower").is_some()
+            }
+            MotorType::Dc => {
+                self.find_dc_motor("lift").is_some() && self.find_dc_motor("tower").is_some()
+            }
+            MotorType::Ac => {
+                self.find_ac_motor("lift").is_some() && self.find_ac_motor("tower").is_some()
+            }
+        }
     }
 
-    /// Get the spin stepper (required)
+    /// Get the spin stepper (for stepper motor machines)
     pub fn spin_stepper(&self) -> Option<&StepperHwConfig> {
         self.find_stepper("spin")
+    }
+
+    /// Get the spin DC motor (for DC motor machines)
+    pub fn spin_dc_motor(&self) -> Option<&DcMotorHwConfig> {
+        self.find_dc_motor("spin")
+    }
+
+    /// Get the spin AC motor (for AC motor machines)
+    pub fn spin_ac_motor(&self) -> Option<&AcMotorHwConfig> {
+        self.find_ac_motor("spin")
+    }
+
+    /// Check if a spin motor is configured (any type)
+    pub fn has_spin_motor(&self) -> bool {
+        match self.motor_type {
+            MotorType::Stepper => self.spin_stepper().is_some(),
+            MotorType::Dc => self.spin_dc_motor().is_some(),
+            MotorType::Ac => self.spin_ac_motor().is_some(),
+        }
     }
 }
 

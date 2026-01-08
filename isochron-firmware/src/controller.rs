@@ -351,7 +351,6 @@ impl Controller {
     pub fn current_temp_c(&self) -> Option<i16> {
         self.safety.get_temperature()
     }
-
 }
 
 #[cfg(test)]
@@ -481,7 +480,10 @@ mod tests {
 
         // Tick should detect the fault
         let event = ctrl.tick(100);
-        assert_eq!(event, Some(Event::ErrorDetected(ErrorKind::OverTemperature)));
+        assert_eq!(
+            event,
+            Some(Event::ErrorDetected(ErrorKind::OverTemperature))
+        );
         assert!(matches!(
             ctrl.state(),
             State::Error(ErrorKind::OverTemperature)

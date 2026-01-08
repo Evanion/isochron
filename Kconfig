@@ -1,0 +1,373 @@
+# Isochron Firmware Configuration
+#
+# This file defines the configuration schema for the Isochron watch cleaner firmware.
+# Use 'make menuconfig' to configure your build, similar to Klipper.
+#
+# Prerequisites: pip install kconfiglib
+
+mainmenu "Isochron Firmware Configuration"
+
+# =============================================================================
+# Controller Board
+# =============================================================================
+menu "Controller Board"
+
+choice
+    prompt "Board Type"
+    default BOARD_BTT_PICO
+    help
+      Select the controller board for your watch cleaner.
+
+config BOARD_BTT_PICO
+    bool "BTT SKR Pico (RP2040)"
+    help
+      BigTreeTech SKR Pico with RP2040 MCU.
+      Common choice for Voron V0 builds.
+      Has integrated TMC2209 stepper drivers.
+
+config BOARD_PICO
+    bool "Raspberry Pi Pico (RP2040)"
+    help
+      Standard Raspberry Pi Pico board.
+      Requires external motor drivers.
+
+config BOARD_FEATHER_RP2040
+    bool "Adafruit Feather RP2040"
+    help
+      Adafruit Feather form factor with RP2040.
+      Compact board for custom/portable builds.
+
+config BOARD_CUSTOM_RP2040
+    bool "Custom RP2040 Board"
+    help
+      Custom RP2040-based board.
+      Define pin mappings in machine.toml.
+
+endchoice
+
+config BOARD_CONFIG
+    string "Board config file"
+    default "configs/boards/btt-pico.toml" if BOARD_BTT_PICO
+    default "configs/boards/pico.toml" if BOARD_PICO
+    default "configs/boards/feather-rp2040.toml" if BOARD_FEATHER_RP2040
+    default "configs/boards/custom-rp2040.toml" if BOARD_CUSTOM_RP2040
+    help
+      Path to the board-specific pin configuration file.
+
+endmenu
+
+# =============================================================================
+# Motor Configuration
+# =============================================================================
+menu "Motor Configuration"
+
+choice
+    prompt "Motor Type"
+    default MOTOR_STEPPER
+    help
+      Select the motor type for your machine.
+
+      Stepper: Precise control with TMC2209 drivers (BTT Pico)
+      DC: Simple PWM-controlled motors via H-bridge/MOSFET
+      AC: Relay-controlled AC induction motors
+
+config MOTOR_STEPPER
+    bool "Stepper Motors (TMC2209)"
+    help
+      Precision stepper motors with TMC2209 drivers.
+      Supports StealthChop for quiet operation.
+      Best for machines needing speed control and positioning.
+
+config MOTOR_DC
+    bool "DC Motors (PWM)"
+    help
+      Simple DC motors controlled via PWM.
+      Uses H-bridge (L298N, TB6612) or MOSFET drivers.
+      Good for basic machines with variable speed.
+
+config MOTOR_AC
+    bool "AC Motors (Relay)"
+    help
+      AC induction motors controlled via relays.
+      Simple on/off control, typically 120V/240V.
+      Common in older or industrial cleaning machines.
+
+endchoice
+
+config MOTOR_COUNT
+    int "Number of motors"
+    default 3
+    range 1 6
+    help
+      Number of motors in your machine.
+      Typical configuration:
+        Motor 0: Basket rotation
+        Motor 1: Arm lift/lower
+        Motor 2: Drum spin (ultrasonic agitation)
+
+# -----------------------------------------------------------------------------
+# Stepper Motor Options
+# -----------------------------------------------------------------------------
+if MOTOR_STEPPER
+
+config TMC_UART_ENABLED
+    bool "TMC2209 UART control"
+    default y
+    help
+      Enable UART communication with TMC2209 drivers.
+      Allows runtime configuration of current, microstepping,
+      StealthChop, and diagnostics.
+
+config TMC_DEFAULT_CURRENT_MA
+    int "Default motor current (mA)"
+    default 800
+    range 100 2000
+    help
+      Default RMS current for stepper motors in milliamps.
+      Can be overridden per-motor in machine.toml.
+
+config TMC_DEFAULT_MICROSTEPS
+    int "Default microstepping"
+    default 16
+    range 1 256
+    help
+      Default microstepping resolution (1, 2, 4, 8, 16, 32, 64, 128, 256).
+      Higher values = smoother motion but more CPU load.
+
+config TMC_STEALTHCHOP
+    bool "Enable StealthChop by default"
+    default y
+    help
+      Use StealthChop for quiet operation.
+      Disable for higher torque at speed (SpreadCycle).
+
+endif # MOTOR_STEPPER
+
+# -----------------------------------------------------------------------------
+# DC Motor Options
+# -----------------------------------------------------------------------------
+if MOTOR_DC
+
+config DC_PWM_FREQ_HZ
+    int "PWM frequency (Hz)"
+    default 25000
+    range 1000 100000
+    help
+      PWM frequency for DC motor speed control.
+      Higher frequencies reduce audible noise but may
+      reduce efficiency. 20-25kHz is typically inaudible.
+
+config DC_SOFT_START_MS
+    int "Soft start ramp time (ms)"
+    default 500
+    range 0 5000
+    help
+      Time to ramp from 0% to target speed.
+      Set to 0 to disable soft start.
+      Reduces mechanical stress and current spikes.
+
+config DC_SOFT_STOP_MS
+    int "Soft stop ramp time (ms)"
+    default 300
+    range 0 5000
+    help
+      Time to ramp from current speed to 0%.
+      Set to 0 for immediate stop.
+
+config DC_MIN_DUTY_PERCENT
+    int "Minimum duty cycle (%)"
+    default 20
+    range 0 50
+    help
+      Minimum PWM duty cycle for motor to reliably start.
+      Motors typically need 15-30% duty to overcome friction.
+
+config DC_DRIVER_TYPE
+    int "DC driver type"
+    default 0
+    range 0 2
+    help
+      0 = Single MOSFET (one direction only)
+      1 = H-Bridge (L298N, TB6612 - bidirectional)
+      2 = Dual MOSFET (separate forward/reverse)
+
+endif # MOTOR_DC
+
+# -----------------------------------------------------------------------------
+# AC Motor Options
+# -----------------------------------------------------------------------------
+if MOTOR_AC
+
+config AC_VOLTAGE
+    int "AC voltage"
+    default 120
+    range 100 240
+    help
+      AC mains voltage (120V for US, 230V for EU).
+      This is for documentation only - ensure your
+      relays and motors are rated appropriately!
+
+config AC_RELAY_ACTIVE_HIGH
+    bool "Relay active high"
+    default y
+    help
+      Set if relays activate on HIGH signal.
+      Unset for active-LOW relays (common with optoisolated modules).
+
+config AC_MIN_SWITCH_DELAY_MS
+    int "Minimum relay switch delay (ms)"
+    default 100
+    range 50 1000
+    help
+      Minimum time between relay state changes.
+      Prevents rapid switching that could damage relays
+      or cause arcing. Also helps with zero-crossing timing.
+
+config AC_INTERLOCK_ENABLED
+    bool "Motor interlock"
+    default y
+    help
+      Prevent multiple motors from running simultaneously.
+      Useful when power supply capacity is limited.
+
+endif # MOTOR_AC
+
+endmenu
+
+# =============================================================================
+# Display Configuration
+# =============================================================================
+menu "Display Configuration"
+
+choice
+    prompt "Display Type"
+    default DISPLAY_V0_MINI
+    help
+      Select the display module for your watch cleaner.
+
+config DISPLAY_V0_MINI
+    bool "V0 Mini OLED (STM32F042)"
+    help
+      Voron V0 Mini display with SH1106 OLED and rotary encoder.
+      Uses STM32F042 MCU, communicates via UART.
+      Requires separate display firmware.
+
+config DISPLAY_DIRECT_OLED
+    bool "Direct OLED (I2C)"
+    help
+      OLED display connected directly to controller via I2C.
+      No separate display MCU required.
+      Supports SSD1306/SH1106 128x64 displays.
+
+config DISPLAY_NONE
+    bool "No Display (Headless)"
+    help
+      Run without a display.
+      Control via USB serial or network API.
+
+endchoice
+
+config BUILD_DISPLAY_FW
+    bool "Build display firmware"
+    default y if DISPLAY_V0_MINI
+    default n
+    help
+      Build the display firmware in addition to the controller firmware.
+      Required for displays with their own MCU (like V0 Mini).
+
+config DISPLAY_UART_BAUD
+    int "Display UART baud rate"
+    default 115200
+    depends on DISPLAY_V0_MINI
+    help
+      Baud rate for UART communication with display.
+
+endmenu
+
+# =============================================================================
+# Machine Configuration
+# =============================================================================
+menu "Machine Configuration"
+
+config MACHINE_CONFIG
+    string "Machine config file"
+    default "configs/machines/default.toml"
+    help
+      Path to the machine configuration file.
+      This defines cleaning cycles, temperatures, timings, etc.
+      The config is embedded into the firmware binary at build time.
+
+config MACHINE_NAME
+    string "Machine name"
+    default "Isochron Cleaner"
+    help
+      Human-readable name shown on display and logs.
+
+endmenu
+
+# =============================================================================
+# Features
+# =============================================================================
+menu "Features"
+
+config FEATURE_USB_SERIAL
+    bool "USB serial console"
+    default y
+    help
+      Enable USB CDC serial port for debugging and control.
+      Provides direct command interface without display.
+
+config FEATURE_WATCHDOG
+    bool "Hardware watchdog"
+    default y
+    help
+      Enable hardware watchdog timer.
+      Automatically resets if firmware hangs for >2 seconds.
+
+config FEATURE_FLASH_CONFIG
+    bool "Flash configuration storage"
+    default y
+    help
+      Store configuration in flash memory.
+      Allows runtime config changes to persist across reboots.
+
+endmenu
+
+# =============================================================================
+# Build Options
+# =============================================================================
+menu "Build Options"
+
+config DEFMT_LOG
+    bool "Enable defmt logging"
+    default y
+    help
+      Enable debug logging via defmt/RTT.
+      Useful for development. Disable for smaller binary.
+
+choice
+    prompt "Log level"
+    default LOG_LEVEL_INFO
+    depends on DEFMT_LOG
+
+config LOG_LEVEL_ERROR
+    bool "Error"
+config LOG_LEVEL_WARN
+    bool "Warn"
+config LOG_LEVEL_INFO
+    bool "Info"
+config LOG_LEVEL_DEBUG
+    bool "Debug"
+config LOG_LEVEL_TRACE
+    bool "Trace"
+
+endchoice
+
+config RELEASE_BUILD
+    bool "Release build (optimized)"
+    default n
+    help
+      Build with release optimizations.
+      Smaller binary, faster execution, but harder to debug.
+
+endmenu

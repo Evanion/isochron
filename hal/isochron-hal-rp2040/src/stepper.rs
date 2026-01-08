@@ -3,10 +3,9 @@
 //! Uses RP2040's Programmable I/O to generate precise step pulses.
 //! Each stepper gets its own state machine for independent control.
 
-use embassy_rp::gpio::{AnyPin, Level, Output};
-use embassy_rp::pio::{
-    Common, Config, Direction as PioDirection, Instance, PioPin, StateMachine,
-};
+use embassy_rp::gpio::{Level, Output, Pin};
+use embassy_rp::pio::{Common, Config, Direction as PioDirection, Instance, PioPin, StateMachine};
+use embassy_rp::Peri;
 use fixed::types::U24F8;
 
 use crate::pio::{calc_clock_divider, StepGeneratorConfig, MAX_STEP_FREQ_HZ};
@@ -42,20 +41,20 @@ impl<'d, PIO: Instance, const SM: usize> PioStepper<'d, PIO, SM> {
     /// * `dir_pin` - GPIO pin for direction control
     /// * `enable_pin` - GPIO pin for enable control
     /// * `config` - Stepper configuration
-    pub fn new<STEP: PioPin>(
+    pub fn new<STEP: PioPin, DIR: Pin, EN: Pin>(
         common: &mut Common<'d, PIO>,
         mut sm: StateMachine<'d, PIO, SM>,
-        step_pin: STEP,
-        dir_pin: AnyPin,
-        enable_pin: AnyPin,
+        step_pin: Peri<'d, STEP>,
+        dir_pin: Peri<'d, DIR>,
+        enable_pin: Peri<'d, EN>,
         config: StepGeneratorConfig,
     ) -> Self {
         // Load the step pulse program using pio macro
         // This 2-instruction program generates a square wave on the step pin
         let prg = pio::pio_asm!(
             ".wrap_target",
-            "set pins, 1",  // Set step pin high
-            "set pins, 0",  // Set step pin low
+            "set pins, 1", // Set step pin high
+            "set pins, 0", // Set step pin low
             ".wrap"
         );
 

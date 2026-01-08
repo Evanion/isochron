@@ -436,7 +436,8 @@ impl Tmc2209Driver {
         let ihold = Tmc2209Config::current_to_cs(hold_ma);
         let irun = Tmc2209Config::current_to_cs(run_ma);
         let iholddelay = 6u32;
-        let value = ((iholddelay & 0x0F) << 16) | ((irun as u32 & 0x1F) << 8) | (ihold as u32 & 0x1F);
+        let value =
+            ((iholddelay & 0x0F) << 16) | ((irun as u32 & 0x1F) << 8) | (ihold as u32 & 0x1F);
         build_write_datagram(self.config.uart_address, reg::IHOLD_IRUN, value)
     }
 
@@ -490,23 +491,30 @@ mod tests {
 
     #[test]
     fn test_mres_conversion() {
-        let mut config = Tmc2209Config::default();
+        let config_256 = Tmc2209Config {
+            microsteps: 256,
+            ..Default::default()
+        };
+        assert_eq!(config_256.mres(), 0);
 
-        config.microsteps = 256;
-        assert_eq!(config.mres(), 0);
+        let config_16 = Tmc2209Config {
+            microsteps: 16,
+            ..Default::default()
+        };
+        assert_eq!(config_16.mres(), 4);
 
-        config.microsteps = 16;
-        assert_eq!(config.mres(), 4);
-
-        config.microsteps = 1;
-        assert_eq!(config.mres(), 8);
+        let config_1 = Tmc2209Config {
+            microsteps: 1,
+            ..Default::default()
+        };
+        assert_eq!(config_1.mres(), 8);
     }
 
     #[test]
     fn test_current_conversion() {
         // 800mA should give roughly CS=11
         let cs = Tmc2209Config::current_to_cs(800);
-        assert!(cs >= 10 && cs <= 13);
+        assert!((10..=13).contains(&cs));
 
         // 400mA should be lower
         let cs_low = Tmc2209Config::current_to_cs(400);
@@ -529,7 +537,7 @@ mod tests {
         assert_eq!(datagram[0], SYNC_BYTE);
         assert_eq!(datagram[1], 0); // address
         assert_eq!(datagram[2], reg::GCONF | 0x80); // register + write bit
-        // Data bytes in big-endian
+                                                    // Data bytes in big-endian
         assert_eq!(datagram[3], 0x00);
         assert_eq!(datagram[4], 0x00);
         assert_eq!(datagram[5], 0x01);
@@ -627,12 +635,18 @@ mod tests {
         // Test invalid sync
         let mut bad_sync = response;
         bad_sync[0] = 0x00;
-        assert_eq!(parse_read_response(&bad_sync), Err(Tmc2209Error::InvalidSync));
+        assert_eq!(
+            parse_read_response(&bad_sync),
+            Err(Tmc2209Error::InvalidSync)
+        );
 
         // Test bad CRC
         let mut bad_crc = response;
         bad_crc[7] = 0x00;
-        assert_eq!(parse_read_response(&bad_crc), Err(Tmc2209Error::CrcMismatch));
+        assert_eq!(
+            parse_read_response(&bad_crc),
+            Err(Tmc2209Error::CrcMismatch)
+        );
     }
 
     #[test]

@@ -126,8 +126,7 @@ mod tests {
 
     #[test]
     fn test_single_direction() {
-        let segments =
-            generate_segments(120, 180, DirectionMode::Clockwise, 0).unwrap();
+        let segments = generate_segments(120, 180, DirectionMode::Clockwise, 0).unwrap();
 
         assert_eq!(segments.len(), 1);
         assert_eq!(segments[0].direction, Direction::Clockwise);
@@ -137,8 +136,7 @@ mod tests {
 
     #[test]
     fn test_alternate_direction() {
-        let segments =
-            generate_segments(120, 180, DirectionMode::Alternate, 3).unwrap();
+        let segments = generate_segments(120, 180, DirectionMode::Alternate, 3).unwrap();
 
         // 3 iterations * 2 segments = 6 segments
         assert_eq!(segments.len(), 6);

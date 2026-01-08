@@ -10,6 +10,8 @@ use defmt::*;
 
 use isochron_core::config::MachineConfig;
 use isochron_hal_rp2040::flash::{FlashError, FlashStorage, StorageKey};
+// Import the FlashStorage trait to bring methods into scope
+use isochron_hal_rp2040::FlashStorageTrait;
 
 use super::toml::parse_config;
 

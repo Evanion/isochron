@@ -4,8 +4,8 @@
 //! - Display → Pico: Input events, heartbeat requests
 //! - Pico → Display: Screen commands, heartbeat responses
 
-use crate::frame::{Frame, FrameError, MAX_PAYLOAD_SIZE};
 use crate::events::InputEvent;
+use crate::frame::{Frame, FrameError, MAX_PAYLOAD_SIZE};
 use heapless::Vec;
 
 // Message type IDs: Display → Pico
@@ -32,23 +32,11 @@ pub enum PicoMessage<'a> {
     /// Clear the entire screen
     Clear,
     /// Draw text at a position
-    Text {
-        row: u8,
-        col: u8,
-        text: &'a str,
-    },
+    Text { row: u8, col: u8, text: &'a str },
     /// Invert a region (for selection highlight)
-    Invert {
-        row: u8,
-        start_col: u8,
-        end_col: u8,
-    },
+    Invert { row: u8, start_col: u8, end_col: u8 },
     /// Draw a horizontal line
-    HLine {
-        row: u8,
-        start_col: u8,
-        end_col: u8,
-    },
+    HLine { row: u8, start_col: u8, end_col: u8 },
     /// Heartbeat response
     Pong,
     /// Reset display to boot state
@@ -66,8 +54,12 @@ impl<'a> PicoMessage<'a> {
                 let len = text_bytes.len().min(DISPLAY_COLS as usize);
 
                 let mut payload = Vec::<u8, MAX_PAYLOAD_SIZE>::new();
-                payload.push(*row).map_err(|_| FrameError::PayloadTooLarge)?;
-                payload.push(*col).map_err(|_| FrameError::PayloadTooLarge)?;
+                payload
+                    .push(*row)
+                    .map_err(|_| FrameError::PayloadTooLarge)?;
+                payload
+                    .push(*col)
+                    .map_err(|_| FrameError::PayloadTooLarge)?;
                 payload
                     .push(len as u8)
                     .map_err(|_| FrameError::PayloadTooLarge)?;
@@ -93,7 +85,67 @@ impl<'a> PicoMessage<'a> {
     }
 }
 
-/// Commands parsed from display-originated frames
+/// Commands parsed from controller-originated frames (received by display)
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum ControllerCommand {
+    /// Heartbeat request
+    Ping,
+    /// Clear the entire screen
+    ClearScreen,
+    /// Draw text at a position
+    Text {
+        row: u8,
+        col: u8,
+        text: heapless::String<21>,
+    },
+    /// Invert a region (for selection highlight)
+    Invert { row: u8, start_col: u8, end_col: u8 },
+    /// Reset display to boot state
+    Reset,
+}
+
+impl ControllerCommand {
+    /// Parse a command from a frame
+    pub fn from_frame(frame: &Frame) -> Result<Self, FrameError> {
+        match frame.msg_type {
+            MSG_PING => Ok(ControllerCommand::Ping),
+            MSG_PONG => Ok(ControllerCommand::Ping), // Treat PONG as PING for display
+            MSG_CLEAR => Ok(ControllerCommand::ClearScreen),
+            MSG_TEXT => {
+                if frame.payload.len() < 3 {
+                    return Err(FrameError::InvalidFrame);
+                }
+                let row = frame.payload[0];
+                let col = frame.payload[1];
+                let len = frame.payload[2] as usize;
+                if frame.payload.len() < 3 + len {
+                    return Err(FrameError::InvalidFrame);
+                }
+                let text_bytes = &frame.payload[3..3 + len];
+                let text =
+                    core::str::from_utf8(text_bytes).map_err(|_| FrameError::InvalidFrame)?;
+                let mut s = heapless::String::new();
+                s.push_str(text).map_err(|_| FrameError::InvalidFrame)?;
+                Ok(ControllerCommand::Text { row, col, text: s })
+            }
+            MSG_INVERT => {
+                if frame.payload.len() < 3 {
+                    return Err(FrameError::InvalidFrame);
+                }
+                Ok(ControllerCommand::Invert {
+                    row: frame.payload[0],
+                    start_col: frame.payload[1],
+                    end_col: frame.payload[2],
+                })
+            }
+            MSG_RESET => Ok(ControllerCommand::Reset),
+            _ => Err(FrameError::InvalidFrame),
+        }
+    }
+}
+
+/// Commands parsed from display-originated frames (received by controller)
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DisplayCommand {
@@ -113,8 +165,8 @@ impl DisplayCommand {
                 if frame.payload.is_empty() {
                     return Err(FrameError::InvalidFrame);
                 }
-                let event = InputEvent::from_byte(frame.payload[0])
-                    .ok_or(FrameError::InvalidFrame)?;
+                let event =
+                    InputEvent::from_byte(frame.payload[0]).ok_or(FrameError::InvalidFrame)?;
                 Ok(DisplayCommand::Input(event))
             }
             MSG_PING => Ok(DisplayCommand::Ping),

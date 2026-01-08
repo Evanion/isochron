@@ -50,7 +50,8 @@ impl Screen {
     pub fn set_line(&mut self, row: u8, text: &str) {
         if (row as usize) < self.lines.len() {
             self.lines[row as usize].clear();
-            let _ = self.lines[row as usize].push_str(&text[..text.len().min(DISPLAY_COLS as usize)]);
+            let _ =
+                self.lines[row as usize].push_str(&text[..text.len().min(DISPLAY_COLS as usize)]);
         }
     }
 
@@ -212,7 +213,10 @@ impl Renderer {
 
         // Step info
         let mut step_line: String<22> = String::new();
-        let _ = write_to_string(&mut step_line, format_args!("Step {}/{}: {}", step_num, total_steps, jar_name));
+        let _ = write_to_string(
+            &mut step_line,
+            format_args!("Step {}/{}: {}", step_num, total_steps, jar_name),
+        );
         self.screen.set_line(1, &step_line);
 
         // Profile
@@ -228,7 +232,10 @@ impl Renderer {
         // Temperature (if applicable)
         if let (Some(current), Some(target)) = (temp_c, target_c) {
             let mut temp_line: String<22> = String::new();
-            let _ = write_to_string(&mut temp_line, format_args!("Temp: {}C / {}C", current, target));
+            let _ = write_to_string(
+                &mut temp_line,
+                format_args!("Temp: {}C / {}C", current, target),
+            );
             self.screen.set_line(4, &temp_line);
         }
 
@@ -255,7 +262,10 @@ impl Renderer {
         let mins = remaining / 60;
         let secs = remaining % 60;
         let mut time_line: String<22> = String::new();
-        let _ = write_to_string(&mut time_line, format_args!("Remaining: {}:{:02}", mins, secs));
+        let _ = write_to_string(
+            &mut time_line,
+            format_args!("Remaining: {}:{:02}", mins, secs),
+        );
         self.screen.set_line(6, &time_line);
 
         // Instructions
@@ -268,7 +278,10 @@ impl Renderer {
         self.screen.set_line(2, "    ** PAUSED **");
 
         let mut info_line: String<22> = String::new();
-        let _ = write_to_string(&mut info_line, format_args!("{} ({}/{})", program_name, step_num, total_steps));
+        let _ = write_to_string(
+            &mut info_line,
+            format_args!("{} ({}/{})", program_name, step_num, total_steps),
+        );
         self.screen.set_line(4, &info_line);
 
         self.screen.set_line(6, "CLICK=Resume");

@@ -37,6 +37,7 @@ const TEMP_TABLE: &[(u32, i16)] = &[
 /// ADC reading trait for platform abstraction
 pub trait AdcReader {
     /// Read ADC value (12-bit, 0-4095)
+    #[allow(clippy::result_unit_err)]
     fn read(&mut self) -> Result<u16, ()>;
 }
 

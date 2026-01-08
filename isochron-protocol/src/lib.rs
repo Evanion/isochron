@@ -20,10 +20,10 @@
 #![no_std]
 #![deny(unsafe_code)]
 
+pub mod events;
 pub mod frame;
 pub mod messages;
-pub mod events;
 
-pub use frame::{Frame, FrameError, FrameParser, FRAME_START, MAX_PAYLOAD_SIZE};
-pub use messages::{DisplayCommand, PicoMessage};
 pub use events::InputEvent;
+pub use frame::{Frame, FrameError, FrameParser, FRAME_START, MAX_PAYLOAD_SIZE};
+pub use messages::{ControllerCommand, DisplayCommand, PicoMessage};

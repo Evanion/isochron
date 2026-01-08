@@ -1,0 +1,133 @@
+# Isochron Watch Cleaner - AC Motor Configuration
+#
+# Example configuration for machines using AC motors with relay control.
+# Common for industrial retrofits or repurposed ultrasonic cleaners.
+
+[machine]
+version = 1
+motor_type = "ac"  # dc, ac, or stepper
+
+# =============================================================================
+# AC MOTORS
+# =============================================================================
+# AC motors are controlled via relay modules (solid state or mechanical).
+# Each motor has enable (on/off) and optional direction (for reversible motors).
+# Speed control is NOT available - AC motors run at fixed speed.
+
+[ac_motor.spin]
+enable_pin = "gpio11"           # Relay control
+direction_pin = "gpio10"        # For reversible motors (optional)
+relay_type = "ssr"              # ssr (solid state) or mechanical
+active_high = true              # Relay activation polarity
+
+[ac_motor.lift]
+enable_pin = "gpio6"
+relay_type = "mechanical"
+active_high = true
+# Limit switches for safety
+endstop_up = "^gpio4"
+endstop_down = "^gpio3"
+
+[ac_motor.tower]
+enable_pin = "gpio19"
+direction_pin = "gpio28"
+relay_type = "ssr"
+active_high = true
+endstop_home = "^gpio16"
+
+# =============================================================================
+# SAFETY SETTINGS
+# =============================================================================
+
+[ac_safety]
+min_switch_delay_ms = 100       # Minimum delay between relay toggles
+interlock_enabled = true        # Prevent multiple motors running simultaneously
+voltage = 120                   # For documentation/safety labels (120 or 240)
+
+# =============================================================================
+# HEATERS (same as other configs)
+# =============================================================================
+
+[heater.dryer]
+heater_pin = "gpio23"
+sensor_pin = "gpio27"
+sensor_type = "ntc100k"
+control = "bang_bang"
+max_temp = 55
+hysteresis = 2
+
+# =============================================================================
+# JARS (same as other configs)
+# =============================================================================
+
+[jar.clean]
+tower_pos = 0
+lift_pos = 120
+
+[jar.rinse1]
+tower_pos = 90
+lift_pos = 120
+
+[jar.rinse2]
+tower_pos = 180
+lift_pos = 120
+
+[jar.dry]
+tower_pos = 270
+lift_pos = 100
+heater = "dryer"
+
+# =============================================================================
+# PROFILES (AC motor version)
+# =============================================================================
+# Note: AC motors have no speed control - they run at fixed speed.
+# The 'speed' field is ignored for AC motors.
+
+[profile.clean]
+label = "Clean"
+time_s = 180
+direction = "alternate"
+iterations = 3
+
+[profile.rinse]
+label = "Rinse"
+time_s = 120
+direction = "cw"
+iterations = 1
+
+[profile.dry]
+label = "Dry"
+time_s = 600
+direction = "alternate"
+iterations = 6
+temperature_c = 45
+
+# =============================================================================
+# PROGRAMS (same as other configs)
+# =============================================================================
+
+[program.full_clean]
+label = "Full Clean"
+steps = [
+    { jar = "clean", profile = "clean" },
+    { jar = "rinse1", profile = "rinse" },
+    { jar = "rinse2", profile = "rinse" },
+    { jar = "dry", profile = "dry" },
+]
+
+[program.quick_clean]
+label = "Quick Clean"
+steps = [
+    { jar = "clean", profile = "clean" },
+    { jar = "rinse1", profile = "rinse" },
+]
+
+# =============================================================================
+# DISPLAY
+# =============================================================================
+
+[display]
+type = "direct_oled"         # I2C OLED on controller
+i2c_sda = "gpio0"
+i2c_scl = "gpio1"
+address = 0x3C

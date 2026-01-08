@@ -7,11 +7,12 @@ license = "GPL-3.0-or-later"
 
 [features]
 default = []
-defmt = ["dep:defmt", "embassy-rp/defmt"]
+defmt = ["dep:defmt", "embassy-rp/defmt", "isochron-hal/defmt"]
 
 [dependencies]
-isochron-core = { path = "../isochron-core", features = ["defmt"] }
-isochron-protocol = { path = "../isochron-protocol" }
+isochron-hal = { path = "../isochron-hal", features = ["sequential-storage"] }
+isochron-core = { path = "../../isochron-core", features = ["defmt"] }
+isochron-protocol = { path = "../../isochron-protocol" }
 
 # Embassy
 embassy-executor = { workspace = true }

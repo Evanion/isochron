@@ -169,10 +169,7 @@ mod tests {
         let mut monitor = SafetyMonitor::new();
         monitor.update_temperature(Some(400));
         monitor.update_motor_stall(true);
-        assert_eq!(
-            monitor.check(),
-            SafetyStatus::Fault(ErrorKind::MotorStall)
-        );
+        assert_eq!(monitor.check(), SafetyStatus::Fault(ErrorKind::MotorStall));
     }
 
     #[test]
@@ -185,10 +182,7 @@ mod tests {
             monitor.update_time(HEARTBEAT_TIMEOUT_MS);
         }
 
-        assert_eq!(
-            monitor.check(),
-            SafetyStatus::Fault(ErrorKind::LinkLost)
-        );
+        assert_eq!(monitor.check(), SafetyStatus::Fault(ErrorKind::LinkLost));
     }
 
     #[test]
