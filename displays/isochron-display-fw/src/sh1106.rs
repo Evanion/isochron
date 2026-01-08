@@ -14,6 +14,7 @@ const HEIGHT: usize = 64;
 const PAGES: usize = HEIGHT / 8;
 
 /// SH1106 commands
+#[allow(dead_code)]
 mod cmd {
     pub const DISPLAY_OFF: u8 = 0xAE;
     pub const DISPLAY_ON: u8 = 0xAF;
@@ -170,12 +171,14 @@ where
     }
 
     /// Set display contrast (0-255)
+    #[allow(dead_code)]
     pub async fn set_contrast(&mut self, contrast: u8) -> Result<(), I2C::Error> {
         self.command(cmd::SET_CONTRAST).await?;
         self.command(contrast).await
     }
 
     /// Turn display on/off
+    #[allow(dead_code)]
     pub async fn set_display_on(&mut self, on: bool) -> Result<(), I2C::Error> {
         if on {
             self.command(cmd::DISPLAY_ON).await
@@ -185,6 +188,7 @@ where
     }
 
     /// Invert display colors
+    #[allow(dead_code)]
     pub async fn set_inverted(&mut self, inverted: bool) -> Result<(), I2C::Error> {
         if inverted {
             self.command(cmd::SET_INVERSE).await

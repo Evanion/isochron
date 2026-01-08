@@ -491,23 +491,30 @@ mod tests {
 
     #[test]
     fn test_mres_conversion() {
-        let mut config = Tmc2209Config::default();
+        let config_256 = Tmc2209Config {
+            microsteps: 256,
+            ..Default::default()
+        };
+        assert_eq!(config_256.mres(), 0);
 
-        config.microsteps = 256;
-        assert_eq!(config.mres(), 0);
+        let config_16 = Tmc2209Config {
+            microsteps: 16,
+            ..Default::default()
+        };
+        assert_eq!(config_16.mres(), 4);
 
-        config.microsteps = 16;
-        assert_eq!(config.mres(), 4);
-
-        config.microsteps = 1;
-        assert_eq!(config.mres(), 8);
+        let config_1 = Tmc2209Config {
+            microsteps: 1,
+            ..Default::default()
+        };
+        assert_eq!(config_1.mres(), 8);
     }
 
     #[test]
     fn test_current_conversion() {
         // 800mA should give roughly CS=11
         let cs = Tmc2209Config::current_to_cs(800);
-        assert!(cs >= 10 && cs <= 13);
+        assert!((10..=13).contains(&cs));
 
         // 400mA should be lower
         let cs_low = Tmc2209Config::current_to_cs(400);

@@ -54,7 +54,7 @@ jobs:
           targets: thumbv6m-none-eabi
       - uses: Swatinem/rust-cache@v2
       - name: Build main firmware
-        run: cargo build -p isochron-firmware --release
+        run: cargo build -p isochron-firmware --release --target thumbv6m-none-eabi
 
   build-display:
     name: Build Display Firmware (STM32)
@@ -66,7 +66,7 @@ jobs:
           targets: thumbv6m-none-eabi
       - uses: Swatinem/rust-cache@v2
       - name: Build display firmware
-        run: cargo build -p isochron-display-fw --release
+        run: cargo build -p isochron-display-fw --release --target thumbv6m-none-eabi
 
   # All checks must pass before merging
   ci-success:
