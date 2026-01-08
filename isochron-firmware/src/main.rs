@@ -16,11 +16,13 @@ use embassy_executor::Spawner;
 use embassy_rp::adc::{Adc, Channel, InterruptHandler as AdcInterruptHandler};
 use embassy_rp::bind_interrupts;
 use embassy_rp::gpio::{Input, Level, Output, Pull};
-use embassy_rp::pwm::{Config as PwmConfig, Pwm};
 use embassy_rp::peripherals::{DMA_CH2, FLASH, PIO0, UART0, UART1};
-use embassy_rp::Peri;
 use embassy_rp::pio::Pio;
-use embassy_rp::uart::{BufferedInterruptHandler, Config as UartConfig, InterruptHandler as UartInterruptHandler, Uart};
+use embassy_rp::pwm::{Config as PwmConfig, Pwm};
+use embassy_rp::uart::{
+    BufferedInterruptHandler, Config as UartConfig, InterruptHandler as UartInterruptHandler, Uart,
+};
+use embassy_rp::Peri;
 use embedded_alloc::LlffHeap as Heap;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
@@ -187,8 +189,17 @@ async fn main(spawner: Spawner) {
     // Only one motor type is active at a time - use enum to hold resources
     enum MotorResources {
         Stepper(PioStepper<'static, PIO0, 0>),
-        Dc(Pwm<'static>, Option<Output<'static>>, Option<Output<'static>>, tasks::DcMotorFwConfig),
-        Ac(Output<'static>, Option<Output<'static>>, tasks::AcMotorFwConfig),
+        Dc(
+            Pwm<'static>,
+            Option<Output<'static>>,
+            Option<Output<'static>>,
+            tasks::DcMotorFwConfig,
+        ),
+        Ac(
+            Output<'static>,
+            Option<Output<'static>>,
+            tasks::AcMotorFwConfig,
+        ),
     }
 
     let motor_resources = match motor_type {
@@ -196,15 +207,13 @@ async fn main(spawner: Spawner) {
             // Setup PIO0 for stepper motor control
             // Pin assignments are board-specific (SKR Pico: STEP=GPIO11, DIR=GPIO10, ENABLE=GPIO12)
             let Pio {
-                mut common,
-                sm0,
-                ..
+                mut common, sm0, ..
             } = Pio::new(p.PIO0, Irqs);
 
             let (steps_per_rev, enable_inverted, _microsteps) = stepper_config_values
                 .unwrap_or_else(|| {
                     warn!("No stepper config found, using defaults");
-                    (3200, false, 16)  // 200 steps * 16 microsteps
+                    (3200, false, 16) // 200 steps * 16 microsteps
                 });
 
             let stepper_config = StepGeneratorConfig {
@@ -218,9 +227,9 @@ async fn main(spawner: Spawner) {
             let stepper = PioStepper::new(
                 &mut common,
                 sm0,
-                p.PIN_11,  // step pin
-                p.PIN_10,  // dir pin
-                p.PIN_12,  // enable pin
+                p.PIN_11, // step pin
+                p.PIN_10, // dir pin
+                p.PIN_12, // enable pin
                 stepper_config,
             );
 
@@ -240,8 +249,8 @@ async fn main(spawner: Spawner) {
             // Enable pin (GPIO12)
             let enable_pin = Output::new(p.PIN_12, Level::Low);
 
-            let (min_duty, soft_start_ms, soft_stop_ms) = dc_motor_config_values
-                .unwrap_or_else(|| {
+            let (min_duty, soft_start_ms, soft_stop_ms) =
+                dc_motor_config_values.unwrap_or_else(|| {
                     warn!("No DC motor config found, using defaults");
                     (20, 500, 300)
                 });
@@ -261,11 +270,10 @@ async fn main(spawner: Spawner) {
             let relay_pin = Output::new(p.PIN_12, Level::Low);
 
             // Direction pin (GPIO10) - optional for reversible AC motors
-            let (active_high, has_direction) = ac_motor_config_values
-                .unwrap_or_else(|| {
-                    warn!("No AC motor config found, using defaults");
-                    (true, false)
-                });
+            let (active_high, has_direction) = ac_motor_config_values.unwrap_or_else(|| {
+                warn!("No AC motor config found, using defaults");
+                (true, false)
+            });
 
             let dir_pin = if has_direction {
                 Some(Output::new(p.PIN_10, Level::Low))
@@ -338,28 +346,27 @@ async fn main(spawner: Spawner) {
         let stepper_microsteps = stepper_config_values.map(|(_, _, ms)| ms).unwrap_or(16);
 
         // TMC2209 configuration from config (already extracted above)
-        let tmc_config = if let Some((uart_addr, run_ma, hold_ma, stealthchop, sg_thresh)) =
-            tmc_config_values
-        {
-            isochron_drivers::stepper::tmc2209::Tmc2209Config {
-                uart_address: uart_addr,
-                run_current_ma: run_ma,
-                hold_current_ma: hold_ma,
-                stealthchop,
-                stallguard_threshold: sg_thresh,
-                microsteps: stepper_microsteps.into(), // u8 -> u16 safely
-            }
-        } else {
-            warn!("No TMC2209 config found, using defaults");
-            isochron_drivers::stepper::tmc2209::Tmc2209Config {
-                uart_address: 0,
-                run_current_ma: 800,
-                hold_current_ma: 400,
-                stealthchop: true,
-                stallguard_threshold: 80,
-                microsteps: 16,
-            }
-        };
+        let tmc_config =
+            if let Some((uart_addr, run_ma, hold_ma, stealthchop, sg_thresh)) = tmc_config_values {
+                isochron_drivers::stepper::tmc2209::Tmc2209Config {
+                    uart_address: uart_addr,
+                    run_current_ma: run_ma,
+                    hold_current_ma: hold_ma,
+                    stealthchop,
+                    stallguard_threshold: sg_thresh,
+                    microsteps: stepper_microsteps.into(), // u8 -> u16 safely
+                }
+            } else {
+                warn!("No TMC2209 config found, using defaults");
+                isochron_drivers::stepper::tmc2209::Tmc2209Config {
+                    uart_address: 0,
+                    run_current_ma: 800,
+                    hold_current_ma: 400,
+                    stealthchop: true,
+                    stallguard_threshold: 80,
+                    microsteps: 16,
+                }
+            };
 
         info!("TMC UART initialized");
 
@@ -396,7 +403,9 @@ async fn main(spawner: Spawner) {
             info!("Stepper motor task spawned");
             // TMC2209 and stall monitor tasks (only for stepper)
             if let Some((tmc_tx, tmc_config, diag_pin, stall_config)) = tmc_resources {
-                spawner.spawn(tasks::tmc_init_task(tmc_tx, tmc_config)).unwrap();
+                spawner
+                    .spawn(tasks::tmc_init_task(tmc_tx, tmc_config))
+                    .unwrap();
                 spawner
                     .spawn(tasks::stall_monitor_task(diag_pin, stall_config))
                     .unwrap();
@@ -418,10 +427,20 @@ async fn main(spawner: Spawner) {
     }
 
     spawner
-        .spawn(tasks::heater_task(adc, therm_channel, heater_pin, heater_config))
+        .spawn(tasks::heater_task(
+            adc,
+            therm_channel,
+            heater_pin,
+            heater_config,
+        ))
         .unwrap();
     spawner
-        .spawn(tasks::controller_task(capabilities, programs, profiles, jars))
+        .spawn(tasks::controller_task(
+            capabilities,
+            programs,
+            profiles,
+            jars,
+        ))
         .unwrap();
 
     info!("All tasks spawned, firmware running");
@@ -508,7 +527,11 @@ fn init_config_from_machine(
     let jars = JARS.init(jars_arr);
 
     // Return slices of actual data (not full arrays)
-    (&programs[..program_count], &profiles[..profile_count], &jars[..jar_count])
+    (
+        &programs[..program_count],
+        &profiles[..profile_count],
+        &jars[..jar_count],
+    )
 }
 
 /// Create the embedded default configuration
@@ -524,7 +547,10 @@ fn create_default_config() -> MachineConfig {
         Err(e) => {
             // This should never happen if machine.toml is valid
             // Fall back to minimal defaults if embedded config is broken
-            error!("Failed to parse embedded config: {:?}", defmt::Debug2Format(&e));
+            error!(
+                "Failed to parse embedded config: {:?}",
+                defmt::Debug2Format(&e)
+            );
             error!("Using minimal fallback configuration");
             create_minimal_fallback_config()
         }

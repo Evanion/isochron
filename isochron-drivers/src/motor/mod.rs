@@ -5,8 +5,8 @@
 //! - DC motors: PWM-controlled with soft start/stop
 //! - AC motors: Relay-controlled with timing safety
 
-pub mod dc;
 pub mod ac;
+pub mod dc;
 
-pub use dc::{DcMotor, DcMotorConfig};
 pub use ac::{AcMotor, AcMotorConfig};
+pub use dc::{DcMotor, DcMotorConfig};

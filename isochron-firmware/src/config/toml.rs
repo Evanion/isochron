@@ -21,8 +21,8 @@ use heapless::String as HString;
 
 use isochron_core::config::{
     DisplayHwConfig, HeaterConfig, HeaterControlMode, HeaterHwConfig, JarConfig, MachineConfig,
-    PinConfig, ProfileConfig, ProfileType, ProgramConfig, ProgramStep, SensorType,
-    StepperHwConfig, Tmc2209HwConfig, UiConfig, MAX_LABEL_LEN,
+    PinConfig, ProfileConfig, ProfileType, ProgramConfig, ProgramStep, SensorType, StepperHwConfig,
+    Tmc2209HwConfig, UiConfig, MAX_LABEL_LEN,
 };
 use isochron_core::scheduler::{DirectionMode, SpinOffConfig};
 
@@ -565,7 +565,9 @@ fn apply_value(
             }
         }
         Section::HeaterHw(_) => {
-            let h = current_heater_hw.as_mut().ok_or(ParseError::InvalidSection)?;
+            let h = current_heater_hw
+                .as_mut()
+                .ok_or(ParseError::InvalidSection)?;
             match key {
                 "heater_pin" => h.heater_pin = parse_pin(value)?,
                 "sensor_pin" => {
@@ -636,20 +638,18 @@ fn apply_value(
                 _ => {}
             }
         }
-        Section::Display => {
-            match key {
-                "uart_tx_pin" | "tx_pin" => {
-                    let pin = parse_pin(value)?;
-                    config.display.uart_tx_pin = pin.pin;
-                }
-                "uart_rx_pin" | "rx_pin" => {
-                    let pin = parse_pin(value)?;
-                    config.display.uart_rx_pin = pin.pin;
-                }
-                "baud" | "baud_rate" => config.display.baud_rate = parse_int(value)?,
-                _ => {}
+        Section::Display => match key {
+            "uart_tx_pin" | "tx_pin" => {
+                let pin = parse_pin(value)?;
+                config.display.uart_tx_pin = pin.pin;
             }
-        }
+            "uart_rx_pin" | "rx_pin" => {
+                let pin = parse_pin(value)?;
+                config.display.uart_rx_pin = pin.pin;
+            }
+            "baud" | "baud_rate" => config.display.baud_rate = parse_int(value)?,
+            _ => {}
+        },
         Section::Ui => match key {
             "rpm_step" => config.ui.rpm_step = parse_int(value)?,
             "time_step_s" => config.ui.time_step_s = parse_int(value)?,
@@ -725,10 +725,7 @@ fn save_section(
         }
         Section::Jar(_) => {
             if let Some(j) = current_jar.take() {
-                config
-                    .jars
-                    .push(j)
-                    .map_err(|_| ParseError::TooManyItems)?;
+                config.jars.push(j).map_err(|_| ParseError::TooManyItems)?;
             }
         }
         Section::Profile(_) | Section::ProfileSpinoff(_) => {

@@ -73,10 +73,7 @@ impl State {
 
     /// Check if this is a terminal state requiring user action
     pub fn is_terminal(&self) -> bool {
-        matches!(
-            self,
-            State::Idle | State::ProgramComplete | State::Error(_)
-        )
+        matches!(self, State::Idle | State::ProgramComplete | State::Error(_))
     }
 
     /// Process an event and return the next state

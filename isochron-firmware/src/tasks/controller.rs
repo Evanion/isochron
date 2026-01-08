@@ -11,7 +11,7 @@ use isochron_core::config::{JarConfig, MachineCapabilities, ProfileConfig, Progr
 use isochron_core::state::State;
 
 use crate::channels::{
-    EVENT_CHANNEL, HEATER_CMD, HEARTBEAT_RECEIVED, INPUT_CHANNEL, MOTOR_CMD, MOTOR_STALL,
+    EVENT_CHANNEL, HEARTBEAT_RECEIVED, HEATER_CMD, INPUT_CHANNEL, MOTOR_CMD, MOTOR_STALL,
     SCREEN_UPDATE, TEMP_READING,
 };
 use crate::controller::Controller;
@@ -157,15 +157,13 @@ async fn render_current_state(controller: &Controller, renderer: &mut Renderer) 
                 // Calculate total time (simplified)
                 let total_time = controller.step_total_s();
 
-                renderer.render_program_detail(
-                    program.label.as_str(),
-                    &steps,
-                    total_time,
-                );
+                renderer.render_program_detail(program.label.as_str(), &steps, total_time);
             }
         }
         State::Running => {
-            if let (Some(profile), Some(jar)) = (controller.current_profile(), controller.current_jar()) {
+            if let (Some(profile), Some(jar)) =
+                (controller.current_profile(), controller.current_jar())
+            {
                 let temp = controller.current_temp_c();
                 let target = profile.temperature_c;
 

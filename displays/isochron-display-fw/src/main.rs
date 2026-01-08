@@ -118,13 +118,7 @@ async fn main(spawner: Spawner) {
     i2c_config.timeout = Duration::from_millis(100);
 
     let i2c = I2c::new(
-        p.I2C1,
-        p.PB6,
-        p.PB7,
-        Irqs,
-        p.DMA1_CH2,
-        p.DMA1_CH3,
-        i2c_config,
+        p.I2C1, p.PB6, p.PB7, Irqs, p.DMA1_CH2, p.DMA1_CH3, i2c_config,
     );
 
     // Initialize OLED display
@@ -306,11 +300,9 @@ async fn button_task(mut btn: ExtiInput<'static>) {
 
         if btn.is_low() {
             // Wait for release or long press timeout
-            let long_press = embassy_time::with_timeout(
-                Duration::from_millis(500),
-                btn.wait_for_rising_edge(),
-            )
-            .await;
+            let long_press =
+                embassy_time::with_timeout(Duration::from_millis(500), btn.wait_for_rising_edge())
+                    .await;
 
             match long_press {
                 Ok(()) => {

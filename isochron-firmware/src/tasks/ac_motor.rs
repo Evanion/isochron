@@ -8,8 +8,8 @@ use embassy_rp::gpio::Output;
 use embassy_time::{Duration, Ticker};
 
 use isochron_core::traits::Direction;
-use isochron_drivers::motor::ac::{AcMotor, AcMotorConfig, AcRelayType};
 use isochron_core::traits::{AcMotorDriver, MotorDriver};
+use isochron_drivers::motor::ac::{AcMotor, AcMotorConfig, AcRelayType};
 
 use crate::channels::MOTOR_CMD;
 
@@ -74,7 +74,11 @@ pub async fn ac_motor_task(
             // Any non-zero RPM means "on" for AC motors
             let should_be_on = cmd.rpm > 0;
 
-            trace!("AC Motor command: on={}, dir={:?}", should_be_on, cmd.direction);
+            trace!(
+                "AC Motor command: on={}, dir={:?}",
+                should_be_on,
+                cmd.direction
+            );
 
             // Handle direction change
             if cmd.direction != last_direction && config.has_direction {

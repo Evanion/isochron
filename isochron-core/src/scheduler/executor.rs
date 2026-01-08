@@ -77,7 +77,9 @@ pub struct HeaterCommand {
 impl HeaterCommand {
     /// Create an off command
     pub const fn off() -> Self {
-        Self { target_temp_c: None }
+        Self {
+            target_temp_c: None,
+        }
     }
 
     /// Create a heating command
@@ -514,11 +516,7 @@ impl Scheduler {
     /// Get total time for current step (seconds)
     pub fn step_total_s(&self) -> u32 {
         let profile_time: u32 = self.step.segments.iter().map(|s| s.duration_s as u32).sum();
-        let spinoff_time = self
-            .step
-            .spinoff
-            .map(|s| s.time_s as u32)
-            .unwrap_or(0);
+        let spinoff_time = self.step.spinoff.map(|s| s.time_s as u32).unwrap_or(0);
         profile_time + spinoff_time
     }
 }
@@ -531,8 +529,8 @@ impl Default for Scheduler {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::segment::DirectionMode;
+    use super::*;
     use heapless::String;
 
     fn make_profile(name: &str, rpm: u16, time_s: u16, direction: DirectionMode) -> ProfileConfig {

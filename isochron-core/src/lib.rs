@@ -13,9 +13,9 @@
 #![no_std]
 #![deny(unsafe_code)]
 
-pub mod traits;
-pub mod state;
-pub mod scheduler;
+pub mod config;
 pub mod motion;
 pub mod safety;
-pub mod config;
+pub mod scheduler;
+pub mod state;
+pub mod traits;

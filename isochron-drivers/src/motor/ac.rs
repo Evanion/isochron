@@ -162,7 +162,8 @@ impl AcMotor {
         self.time_since_switch_ms = self.time_since_switch_ms.saturating_add(delta_ms);
 
         if self.switch_delay_remaining_ms > 0 {
-            self.switch_delay_remaining_ms = self.switch_delay_remaining_ms.saturating_sub(delta_ms);
+            self.switch_delay_remaining_ms =
+                self.switch_delay_remaining_ms.saturating_sub(delta_ms);
         }
 
         if !self.enabled {

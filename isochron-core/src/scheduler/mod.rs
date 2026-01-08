@@ -9,4 +9,4 @@ pub mod segment;
 pub use executor::{
     ExecutionPhase, HeaterCommand, MotorCommand, Scheduler, StepState, MAX_SEGMENTS,
 };
-pub use segment::{DirectionMode, Segment, SpinOffConfig, generate_segments};
+pub use segment::{generate_segments, DirectionMode, Segment, SpinOffConfig};

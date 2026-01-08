@@ -16,7 +16,7 @@ pub struct BangBangConfig {
 impl Default for BangBangConfig {
     fn default() -> Self {
         Self {
-            max_temp_x10: 550, // 55.0°C
+            max_temp_x10: 550,  // 55.0°C
             hysteresis_x10: 20, // 2.0°C
         }
     }

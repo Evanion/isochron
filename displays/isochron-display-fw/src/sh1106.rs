@@ -67,9 +67,9 @@ where
             0x00,
             cmd::SET_START_LINE | 0x00,
             cmd::SET_CHARGE_PUMP,
-            0x14, // Enable charge pump
-            cmd::SET_SEG_REMAP,      // Flip horizontally
-            cmd::SET_COM_SCAN_DEC,   // Flip vertically
+            0x14,                  // Enable charge pump
+            cmd::SET_SEG_REMAP,    // Flip horizontally
+            cmd::SET_COM_SCAN_DEC, // Flip vertically
             cmd::SET_COM_PINS,
             0x12, // Alternative COM config
             cmd::SET_CONTRAST,

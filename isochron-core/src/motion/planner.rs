@@ -161,11 +161,7 @@ impl MotionPlanner {
     /// Returns time in milliseconds
     pub fn time_to_target(&self) -> u32 {
         let target_x10 = (self.target_rpm as u32) * 10;
-        let diff = if self.current_rpm_x10 > target_x10 {
-            self.current_rpm_x10 - target_x10
-        } else {
-            target_x10 - self.current_rpm_x10
-        };
+        let diff = self.current_rpm_x10.abs_diff(target_x10);
 
         // time_ms = diff / (accel * 10 / 1000) = diff * 1000 / (accel * 10)
         if self.accel_rpm_per_s == 0 {

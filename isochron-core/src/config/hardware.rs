@@ -9,8 +9,8 @@ use heapless::{String, Vec};
 use serde::{Deserialize, Serialize};
 
 use super::types::{
-    HeaterConfig, JarConfig, ProfileConfig, ProgramConfig, UiConfig,
-    MAX_JARS, MAX_LABEL_LEN, MAX_PROFILES, MAX_PROGRAMS,
+    HeaterConfig, JarConfig, ProfileConfig, ProgramConfig, UiConfig, MAX_JARS, MAX_LABEL_LEN,
+    MAX_PROFILES, MAX_PROGRAMS,
 };
 
 /// Maximum steppers per config

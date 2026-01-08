@@ -78,8 +78,7 @@ pub trait DisplayExt: DisplayDriver {
             buf[2..2 + len].copy_from_slice(&text_bytes[..len]);
 
             // Safe because we only use ASCII
-            let display_text =
-                core::str::from_utf8(&buf[..2 + len]).unwrap_or("");
+            let display_text = core::str::from_utf8(&buf[..2 + len]).unwrap_or("");
             self.text(row, 0, display_text)?;
             self.invert(row, 0, 20)?;
         } else {
@@ -90,8 +89,7 @@ pub trait DisplayExt: DisplayDriver {
             let len = text_bytes.len().min(19);
             buf[2..2 + len].copy_from_slice(&text_bytes[..len]);
 
-            let display_text =
-                core::str::from_utf8(&buf[..2 + len]).unwrap_or("");
+            let display_text = core::str::from_utf8(&buf[..2 + len]).unwrap_or("");
             self.text(row, 0, display_text)?;
         }
 
@@ -99,12 +97,7 @@ pub trait DisplayExt: DisplayDriver {
     }
 
     /// Draw a label-value pair
-    fn draw_field(
-        &mut self,
-        row: u8,
-        label: &str,
-        value: &str,
-    ) -> Result<(), DisplayError> {
+    fn draw_field(&mut self, row: u8, label: &str, value: &str) -> Result<(), DisplayError> {
         // Format: "Label:     Value"
         let mut buf = [b' '; 21];
 

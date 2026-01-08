@@ -15,36 +15,96 @@ use embassy_rp::Peripherals;
 /// ```
 #[macro_export]
 macro_rules! take_pin {
-    ($p:expr, 0) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_0) };
-    ($p:expr, 1) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_1) };
-    ($p:expr, 2) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_2) };
-    ($p:expr, 3) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_3) };
-    ($p:expr, 4) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_4) };
-    ($p:expr, 5) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_5) };
-    ($p:expr, 6) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_6) };
-    ($p:expr, 7) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_7) };
-    ($p:expr, 8) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_8) };
-    ($p:expr, 9) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_9) };
-    ($p:expr, 10) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_10) };
-    ($p:expr, 11) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_11) };
-    ($p:expr, 12) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_12) };
-    ($p:expr, 13) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_13) };
-    ($p:expr, 14) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_14) };
-    ($p:expr, 15) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_15) };
-    ($p:expr, 16) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_16) };
-    ($p:expr, 17) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_17) };
-    ($p:expr, 18) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_18) };
-    ($p:expr, 19) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_19) };
-    ($p:expr, 20) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_20) };
-    ($p:expr, 21) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_21) };
-    ($p:expr, 22) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_22) };
-    ($p:expr, 23) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_23) };
-    ($p:expr, 24) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_24) };
-    ($p:expr, 25) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_25) };
-    ($p:expr, 26) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_26) };
-    ($p:expr, 27) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_27) };
-    ($p:expr, 28) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_28) };
-    ($p:expr, 29) => { embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_29) };
+    ($p:expr, 0) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_0)
+    };
+    ($p:expr, 1) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_1)
+    };
+    ($p:expr, 2) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_2)
+    };
+    ($p:expr, 3) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_3)
+    };
+    ($p:expr, 4) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_4)
+    };
+    ($p:expr, 5) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_5)
+    };
+    ($p:expr, 6) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_6)
+    };
+    ($p:expr, 7) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_7)
+    };
+    ($p:expr, 8) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_8)
+    };
+    ($p:expr, 9) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_9)
+    };
+    ($p:expr, 10) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_10)
+    };
+    ($p:expr, 11) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_11)
+    };
+    ($p:expr, 12) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_12)
+    };
+    ($p:expr, 13) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_13)
+    };
+    ($p:expr, 14) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_14)
+    };
+    ($p:expr, 15) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_15)
+    };
+    ($p:expr, 16) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_16)
+    };
+    ($p:expr, 17) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_17)
+    };
+    ($p:expr, 18) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_18)
+    };
+    ($p:expr, 19) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_19)
+    };
+    ($p:expr, 20) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_20)
+    };
+    ($p:expr, 21) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_21)
+    };
+    ($p:expr, 22) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_22)
+    };
+    ($p:expr, 23) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_23)
+    };
+    ($p:expr, 24) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_24)
+    };
+    ($p:expr, 25) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_25)
+    };
+    ($p:expr, 26) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_26)
+    };
+    ($p:expr, 27) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_27)
+    };
+    ($p:expr, 28) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_28)
+    };
+    ($p:expr, 29) => {
+        embassy_rp::Peri::<embassy_rp::gpio::AnyPin>::from($p.PIN_29)
+    };
 }
 
 /// Error when requesting a pin

@@ -9,8 +9,8 @@ use embassy_rp::pwm::{Config as PwmConfig, Pwm};
 use embassy_time::{Duration, Ticker};
 
 use isochron_core::traits::Direction;
-use isochron_drivers::motor::dc::{DcMotor, DcMotorConfig};
 use isochron_core::traits::{DcMotorDriver, MotorDriver};
+use isochron_drivers::motor::dc::{DcMotor, DcMotorConfig};
 
 use crate::channels::MOTOR_CMD;
 
@@ -84,7 +84,11 @@ pub async fn dc_motor_task(
             // Interpret RPM as speed percentage (0-100)
             let speed = (cmd.rpm.min(100)) as u8;
 
-            trace!("DC Motor command: speed={}%, dir={:?}", speed, cmd.direction);
+            trace!(
+                "DC Motor command: speed={}%, dir={:?}",
+                speed,
+                cmd.direction
+            );
 
             // Handle direction change
             if cmd.direction != last_direction {

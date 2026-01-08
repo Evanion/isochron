@@ -4,9 +4,7 @@
 //! Each stepper gets its own state machine for independent control.
 
 use embassy_rp::gpio::{Level, Output, Pin};
-use embassy_rp::pio::{
-    Common, Config, Direction as PioDirection, Instance, PioPin, StateMachine,
-};
+use embassy_rp::pio::{Common, Config, Direction as PioDirection, Instance, PioPin, StateMachine};
 use embassy_rp::Peri;
 use fixed::types::U24F8;
 
@@ -55,8 +53,8 @@ impl<'d, PIO: Instance, const SM: usize> PioStepper<'d, PIO, SM> {
         // This 2-instruction program generates a square wave on the step pin
         let prg = pio::pio_asm!(
             ".wrap_target",
-            "set pins, 1",  // Set step pin high
-            "set pins, 0",  // Set step pin low
+            "set pins, 1", // Set step pin high
+            "set pins, 0", // Set step pin low
             ".wrap"
         );
 

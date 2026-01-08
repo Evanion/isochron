@@ -259,7 +259,7 @@ mod tests {
         assert_eq!(buffer[0], FRAME_START);
         assert_eq!(buffer[1], 8); // length
         assert_eq!(buffer[2], 0x21); // type
-        // payload starts at buffer[3]
+                                     // payload starts at buffer[3]
         assert_eq!(buffer[3], 0); // row
         assert_eq!(buffer[4], 0); // col
         assert_eq!(buffer[5], 5); // string length

@@ -77,14 +77,22 @@ pub trait FlashStorage {
     ///
     /// # Returns
     /// The number of bytes read, or an error.
-    fn read(&mut self, key: StorageKey, buffer: &mut [u8]) -> impl core::future::Future<Output = Result<usize, FlashError>>;
+    fn read(
+        &mut self,
+        key: StorageKey,
+        buffer: &mut [u8],
+    ) -> impl core::future::Future<Output = Result<usize, FlashError>>;
 
     /// Write a value by key
     ///
     /// # Arguments
     /// * `key` - The storage key to write
     /// * `data` - Data to write
-    fn write(&mut self, key: StorageKey, data: &[u8]) -> impl core::future::Future<Output = Result<(), FlashError>>;
+    fn write(
+        &mut self,
+        key: StorageKey,
+        data: &[u8],
+    ) -> impl core::future::Future<Output = Result<(), FlashError>>;
 
     /// Check if a key exists in storage
     fn exists(&mut self, key: StorageKey) -> impl core::future::Future<Output = bool>;

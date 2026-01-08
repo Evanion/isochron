@@ -4,8 +4,8 @@
 //! - Display → Pico: Input events, heartbeat requests
 //! - Pico → Display: Screen commands, heartbeat responses
 
-use crate::frame::{Frame, FrameError, MAX_PAYLOAD_SIZE};
 use crate::events::InputEvent;
+use crate::frame::{Frame, FrameError, MAX_PAYLOAD_SIZE};
 use heapless::Vec;
 
 // Message type IDs: Display → Pico
@@ -32,23 +32,11 @@ pub enum PicoMessage<'a> {
     /// Clear the entire screen
     Clear,
     /// Draw text at a position
-    Text {
-        row: u8,
-        col: u8,
-        text: &'a str,
-    },
+    Text { row: u8, col: u8, text: &'a str },
     /// Invert a region (for selection highlight)
-    Invert {
-        row: u8,
-        start_col: u8,
-        end_col: u8,
-    },
+    Invert { row: u8, start_col: u8, end_col: u8 },
     /// Draw a horizontal line
-    HLine {
-        row: u8,
-        start_col: u8,
-        end_col: u8,
-    },
+    HLine { row: u8, start_col: u8, end_col: u8 },
     /// Heartbeat response
     Pong,
     /// Reset display to boot state
@@ -66,8 +54,12 @@ impl<'a> PicoMessage<'a> {
                 let len = text_bytes.len().min(DISPLAY_COLS as usize);
 
                 let mut payload = Vec::<u8, MAX_PAYLOAD_SIZE>::new();
-                payload.push(*row).map_err(|_| FrameError::PayloadTooLarge)?;
-                payload.push(*col).map_err(|_| FrameError::PayloadTooLarge)?;
+                payload
+                    .push(*row)
+                    .map_err(|_| FrameError::PayloadTooLarge)?;
+                payload
+                    .push(*col)
+                    .map_err(|_| FrameError::PayloadTooLarge)?;
                 payload
                     .push(len as u8)
                     .map_err(|_| FrameError::PayloadTooLarge)?;
@@ -102,7 +94,11 @@ pub enum ControllerCommand {
     /// Clear the entire screen
     ClearScreen,
     /// Draw text at a position
-    Text { row: u8, col: u8, text: heapless::String<21> },
+    Text {
+        row: u8,
+        col: u8,
+        text: heapless::String<21>,
+    },
     /// Invert a region (for selection highlight)
     Invert { row: u8, start_col: u8, end_col: u8 },
     /// Reset display to boot state
@@ -127,8 +123,8 @@ impl ControllerCommand {
                     return Err(FrameError::InvalidFrame);
                 }
                 let text_bytes = &frame.payload[3..3 + len];
-                let text = core::str::from_utf8(text_bytes)
-                    .map_err(|_| FrameError::InvalidFrame)?;
+                let text =
+                    core::str::from_utf8(text_bytes).map_err(|_| FrameError::InvalidFrame)?;
                 let mut s = heapless::String::new();
                 s.push_str(text).map_err(|_| FrameError::InvalidFrame)?;
                 Ok(ControllerCommand::Text { row, col, text: s })
@@ -169,8 +165,8 @@ impl DisplayCommand {
                 if frame.payload.is_empty() {
                     return Err(FrameError::InvalidFrame);
                 }
-                let event = InputEvent::from_byte(frame.payload[0])
-                    .ok_or(FrameError::InvalidFrame)?;
+                let event =
+                    InputEvent::from_byte(frame.payload[0]).ok_or(FrameError::InvalidFrame)?;
                 Ok(DisplayCommand::Input(event))
             }
             MSG_PING => Ok(DisplayCommand::Ping),

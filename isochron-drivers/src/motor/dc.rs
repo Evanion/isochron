@@ -136,7 +136,7 @@ impl DcMotor {
             return self.ramp_end_speed;
         }
 
-        let progress = (self.ramp_time_ms as u32 * 100) / ramp_time_total_ms as u32;
+        let progress = (self.ramp_time_ms * 100) / ramp_time_total_ms as u32;
         let progress = progress.min(100) as u8;
 
         if self.ramp_start_speed < self.ramp_end_speed {
