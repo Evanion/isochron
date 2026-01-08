@@ -81,7 +81,8 @@ impl Default for ProfileConfig {
 pub struct JarConfig {
     /// Jar name/identifier
     pub name: String<MAX_LABEL_LEN>,
-    /// X-axis motor position for jar selection (degrees from home)
+    /// X-axis motor position for jar selection (mm from home)
+    /// For rotary carousels, this is the arc distance from home position.
     pub x_pos: i32,
     /// Z-axis motor position for lift (mm down from top)
     pub z_pos: i32,

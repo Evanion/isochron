@@ -323,28 +323,28 @@ max_temp = 55
 hysteresis = 2
 
 # === JARS (define physical jar positions) ===
-# Positions are coordinates from endstop after homing
-# - For tower rotation: degrees from home
-# - For linear position: mm from home
-# - For lift: mm down from top
+# All positions are in mm from home position after homing
+# - x_pos: For rotary carousels, arc distance from home
+#          For linear machines, linear distance from home
+# - z_pos: mm down from top
 
 [jar clean]
-tower_pos = 0                       # degrees from home (first jar at home)
-lift_pos = 120                      # mm down (lowered into jar)
+x_pos = 0                           # mm from home (first jar at home)
+z_pos = 120                         # mm down (lowered into jar)
 # heater = "jar_clean"              # Optional per-jar heater
 # ultrasonic = "us_clean"           # Optional ultrasonic module
 
 [jar rinse1]
-tower_pos = 90                      # 90 degrees rotation
-lift_pos = 120
+x_pos = 200                         # mm arc distance (for rotary) or linear
+z_pos = 120
 
 [jar rinse2]
-tower_pos = 180                     # 180 degrees rotation
-lift_pos = 120
+x_pos = 400                         # mm
+z_pos = 120
 
 [jar dry]
-tower_pos = 270                     # 270 degrees rotation
-lift_pos = 100                      # Shallower for drying chamber
+x_pos = 600                         # mm
+z_pos = 100                         # Shallower for drying chamber
 heater = "dryer"                    # Drying chamber heater
 
 # === ACCESSORIES ===

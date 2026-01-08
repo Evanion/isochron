@@ -132,28 +132,30 @@ hysteresis = 2
 # Define physical jar positions for automated machines.
 # For manual machines, these define the jar sequence only.
 #
-# x_pos: degrees from home (for x motor rotation/jar selection)
+# x_pos: mm from home (for x motor/jar selection)
+#        For rotary carousels: arc distance from home position
+#        For linear machines: linear distance from home
 # z_pos: mm down from top (for z motor/lift)
 # heater: optional heater name to use for this jar
 # lid: optional lid motor name (multiple jars can share one motor)
 
 [jar.clean]
-x_pos = 0
+x_pos = 0                 # mm (home position)
 z_pos = 120
 # lid = "lid"              # shared lid motor for all jars
 
 [jar.rinse1]
-x_pos = 90
+x_pos = 200               # mm (arc distance for rotary, linear for straight)
 z_pos = 120
 # lid = "lid"
 
 [jar.rinse2]
-x_pos = 180
+x_pos = 400               # mm
 z_pos = 120
 # lid = "lid"
 
 [jar.dry]
-x_pos = 270
+x_pos = 600               # mm
 z_pos = 100
 heater = "dryer"
 # lid = "lid_dry"          # or individual lid motor for this jar

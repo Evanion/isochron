@@ -100,7 +100,10 @@ pub struct StepperHwConfig {
     pub full_steps_per_rotation: u16,
     /// Microsteps setting
     pub microsteps: u8,
-    /// Rotation distance (mm for linear, degrees for rotational)
+    /// Rotation distance in mm per motor rotation
+    /// For linear axes (z/lift): leadscrew pitch (e.g., 8mm for T8 leadscrew)
+    /// For rotary axes (x/carousel): arc circumference per rotation
+    /// For basket: typically 360 (treating degrees as mm for RPM calc)
     pub rotation_distance: u16,
     /// Gear ratio numerator (e.g., 3 for 3:1)
     pub gear_ratio_num: u8,

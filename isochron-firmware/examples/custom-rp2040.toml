@@ -81,21 +81,23 @@ hysteresis = 2
 # =============================================================================
 # JARS
 # =============================================================================
+# x_pos/z_pos are in mm. For rotary carousels, x_pos is arc distance from home.
+# Measure your jar spacing and enter values here.
 
 [jar.clean]
-x_pos = 0
+x_pos = 0                # mm (home position)
 z_pos = 120
 
 [jar.rinse1]
-x_pos = 90
+x_pos = 200              # mm - adjust for your jar spacing
 z_pos = 120
 
 [jar.rinse2]
-x_pos = 180
+x_pos = 400              # mm
 z_pos = 120
 
 [jar.dry]
-x_pos = 270
+x_pos = 600              # mm
 z_pos = 100
 heater = "dryer"
 

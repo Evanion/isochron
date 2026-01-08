@@ -343,19 +343,19 @@ fn validate_jars(config: &toml::Value) {
         };
 
         // x_pos and z_pos are optional (for manual machines)
-        // but if present, must be valid numbers
+        // but if present, must be valid numbers (in mm)
         // Also accept legacy names tower_pos/lift_pos for backwards compatibility
         let x_pos = jar.get("x_pos").or_else(|| jar.get("tower_pos"));
         if let Some(toml::Value::Integer(pos)) = x_pos {
-            if *pos < 0 || *pos > 360 {
-                errors.push(format!("[jar.{}] x_pos must be 0-360", name));
+            if *pos < 0 || *pos > 10000 {
+                errors.push(format!("[jar.{}] x_pos must be 0-10000 mm", name));
             }
         }
 
         let z_pos = jar.get("z_pos").or_else(|| jar.get("lift_pos"));
         if let Some(toml::Value::Integer(pos)) = z_pos {
             if *pos < 0 || *pos > 1000 {
-                errors.push(format!("[jar.{}] z_pos must be 0-1000", name));
+                errors.push(format!("[jar.{}] z_pos must be 0-1000 mm", name));
             }
         }
 

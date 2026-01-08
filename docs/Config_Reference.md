@@ -395,7 +395,9 @@ Defines a jar (cleaning station) in the machine.
 #   Define jar named "clean".
 
 #x_pos = 0
-#   Position in degrees from home for the x motor (jar selection).
+#   Position in mm from home for the x motor (jar selection).
+#   For rotary carousels: arc distance from home position.
+#   For linear machines: linear distance from home.
 #   Only used on automated machines with x stepper.
 #   The default is 0.
 
