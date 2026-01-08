@@ -118,19 +118,61 @@ fn format_error_lines(msg: &str) -> String {
 fn validate_required_sections(config: &toml::Value) {
     let mut errors = Vec::new();
 
+    // Determine motor type (defaults to "stepper")
+    let motor_type = config
+        .get("machine")
+        .and_then(|m| m.get("motor_type"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("stepper");
+
+    // Check for required basket motor based on motor_type
+    let has_basket = match motor_type {
+        "stepper" => config
+            .get("stepper")
+            .and_then(|s| s.get("basket"))
+            .is_some(),
+        "dc" => config
+            .get("dc_motor")
+            .and_then(|s| s.get("basket"))
+            .is_some(),
+        "ac" => config
+            .get("ac_motor")
+            .and_then(|s| s.get("basket"))
+            .is_some(),
+        _ => {
+            errors.push(format!(
+                "Invalid motor_type '{}' - must be 'stepper', 'dc', or 'ac'",
+                motor_type
+            ));
+            true // Skip basket check for invalid motor_type
+        }
+    };
+
+    if !has_basket {
+        let section_name = match motor_type {
+            "dc" => "[dc_motor.basket]",
+            "ac" => "[ac_motor.basket]",
+            _ => "[stepper.basket]",
+        };
+        errors.push(format!(
+            "Missing {} - basket motor is required",
+            section_name
+        ));
+    }
+
     // Check for at least one profile
     if config.get("profile").is_none() {
-        errors.push("Missing [profile.*] section - at least one profile is required");
+        errors.push("Missing [profile.*] section - at least one profile is required".to_string());
     }
 
     // Check for at least one program
     if config.get("program").is_none() {
-        errors.push("Missing [program.*] section - at least one program is required");
+        errors.push("Missing [program.*] section - at least one program is required".to_string());
     }
 
     // Check for at least one jar
     if config.get("jar").is_none() {
-        errors.push("Missing [jar.*] section - at least one jar is required");
+        errors.push("Missing [jar.*] section - at least one jar is required".to_string());
     }
 
     if !errors.is_empty() {
