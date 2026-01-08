@@ -108,23 +108,28 @@ hysteresis = 2
 # x_pos: degrees from home (for x motor rotation/jar selection)
 # z_pos: mm down from top (for z motor/lift)
 # heater: optional heater name to use for this jar
+# lid: optional lid motor name (multiple jars can share one motor)
 
 [jar.clean]
 x_pos = 0
 z_pos = 120
+# lid = "lid"              # shared lid motor for all jars
 
 [jar.rinse1]
 x_pos = 90
 z_pos = 120
+# lid = "lid"
 
 [jar.rinse2]
 x_pos = 180
 z_pos = 120
+# lid = "lid"
 
 [jar.dry]
 x_pos = 270
 z_pos = 100
 heater = "dryer"
+# lid = "lid_dry"          # or individual lid motor for this jar
 
 # =============================================================================
 # PROFILES

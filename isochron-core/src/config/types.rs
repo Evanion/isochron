@@ -89,6 +89,8 @@ pub struct JarConfig {
     pub heater: Option<String<MAX_LABEL_LEN>>,
     /// Associated ultrasonic module name (optional)
     pub ultrasonic: Option<String<MAX_LABEL_LEN>>,
+    /// Associated lid motor name (optional)
+    pub lid: Option<String<MAX_LABEL_LEN>>,
 }
 
 /// Program step (jar + profile pair)

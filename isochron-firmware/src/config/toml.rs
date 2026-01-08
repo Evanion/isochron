@@ -621,6 +621,10 @@ fn apply_value(
                     j.ultrasonic =
                         Some(HString::try_from(name).map_err(|_| ParseError::InvalidValue)?);
                 }
+                "lid" => {
+                    let name = parse_string(value)?;
+                    j.lid = Some(HString::try_from(name).map_err(|_| ParseError::InvalidValue)?);
+                }
                 _ => {}
             }
         }

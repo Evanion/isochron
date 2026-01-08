@@ -409,6 +409,11 @@ Defines a jar (cleaning station) in the machine.
 #ultrasonic = "us_clean"
 #   Name of the ultrasonic module for this jar. Optional.
 #   (Future feature)
+
+#lid = "lid"
+#   Name of the lid motor for this jar. Optional.
+#   Multiple jars can reference the same lid motor for shared mechanisms
+#   (e.g., cam or finger actuator), or each jar can have its own.
 ```
 
 #### Standard Jar Names
