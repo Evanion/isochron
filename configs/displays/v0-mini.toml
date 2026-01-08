@@ -1,0 +1,18 @@
+# V0 Mini OLED Display Configuration
+# For use with STM32F042-based display module
+
+[display]
+type = "v0-mini"
+driver = "sh1106"
+width = 128
+height = 64
+i2c_address = 0x3C
+
+[encoder]
+# Encoder configuration
+steps_per_detent = 4
+inverted = false
+
+[uart]
+# UART communication with controller
+baudrate = 115200

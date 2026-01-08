@@ -197,6 +197,115 @@ The firmware monitors heaters for safety:
 
 ---
 
+## DC Motor Configuration
+
+### [dc_motor name]
+
+Defines a DC motor with PWM speed control. Use this instead of `[stepper]` for simple DC motors.
+
+```toml
+[dc_motor spin]
+#   Configure DC motor named "spin".
+
+pwm_pin = "gpio11"
+#   The GPIO pin for PWM output. This parameter must be provided.
+
+#dir_pin = "gpio10"
+#   The GPIO pin for direction control. Optional - omit for
+#   unidirectional motors.
+
+#enable_pin = "!gpio12"
+#   The GPIO pin for motor enable. Prefix with ! for active-low.
+#   Optional - omit if motor runs whenever PWM is applied.
+
+#pwm_frequency = 25000
+#   PWM frequency in Hz. Higher frequencies are quieter but may
+#   reduce efficiency. The default is 25000 (25kHz).
+
+#min_duty = 20
+#   Minimum duty cycle percentage (0-100). Motor won't turn below
+#   this threshold. The default is 20.
+
+#soft_start_ms = 500
+#   Ramp-up time in milliseconds from 0 to target speed.
+#   Reduces mechanical stress. The default is 500.
+
+#soft_stop_ms = 300
+#   Ramp-down time in milliseconds from current speed to 0.
+#   The default is 300.
+```
+
+#### DC Motor Speed Control
+
+For DC motors, the `rpm` value in profiles is interpreted as a speed percentage (0-100), not actual RPM:
+
+```toml
+[profile clean]
+rpm = 75  # 75% duty cycle for DC motors
+```
+
+---
+
+## AC Motor Configuration
+
+### [ac_motor name]
+
+Defines an AC motor with relay control. Use this for AC induction motors that run at fixed speed.
+
+```toml
+[ac_motor spin]
+#   Configure AC motor named "spin".
+
+relay_pin = "gpio12"
+#   The GPIO pin controlling the motor relay/contactor.
+#   This parameter must be provided.
+
+#dir_pin = "gpio10"
+#   The GPIO pin for direction control (reversing contactor).
+#   Optional - omit for unidirectional motors.
+
+#active_high = true
+#   Set to false if the relay is active-low. The default is true.
+
+#relay_type = "mechanical"
+#   Type of relay. Options:
+#   - "mechanical": Standard relay (needs switch delay)
+#   - "ssr": Solid-state relay (faster switching)
+#   The default is "mechanical".
+
+#min_switch_delay_ms = 100
+#   Minimum time between relay state changes (milliseconds).
+#   Prevents rapid switching that can damage contactors.
+#   The default is 100.
+```
+
+#### AC Motor Speed
+
+AC motors run at fixed speed determined by line frequency and motor poles. The `rpm` value in profiles is interpreted as on (> 0) or off (0):
+
+```toml
+[profile clean]
+rpm = 1  # Any non-zero value turns AC motor on
+```
+
+---
+
+## Motor Type Selection
+
+Set the motor type at the top of your configuration:
+
+```toml
+motor_type = "stepper"  # Options: "stepper", "dc", "ac"
+```
+
+| Type | Driver Section | Speed Control |
+|------|----------------|---------------|
+| `stepper` | `[stepper]` + `[tmc2209]` | Precise RPM via microstepping |
+| `dc` | `[dc_motor]` | PWM duty cycle (0-100%) |
+| `ac` | `[ac_motor]` | On/off only |
+
+---
+
 ## Display Configuration
 
 ### [display]
