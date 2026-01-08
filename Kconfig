@@ -45,14 +45,8 @@ config BOARD_CUSTOM_RP2040
 
 endchoice
 
-config BOARD_CONFIG
-    string "Board config file"
-    default "configs/boards/btt-pico.toml" if BOARD_BTT_PICO
-    default "configs/boards/pico.toml" if BOARD_PICO
-    default "configs/boards/feather-rp2040.toml" if BOARD_FEATHER_RP2040
-    default "configs/boards/custom-rp2040.toml" if BOARD_CUSTOM_RP2040
-    help
-      Path to the board-specific pin configuration file.
+# Note: Board pin mappings are now in isochron-firmware/machine.toml
+# Use examples/btt-pico.toml, examples/custom-rp2040.toml, etc. as templates.
 
 endmenu
 
@@ -289,13 +283,9 @@ endmenu
 # =============================================================================
 menu "Machine Configuration"
 
-config MACHINE_CONFIG
-    string "Machine config file"
-    default "configs/machines/default.toml"
-    help
-      Path to the machine configuration file.
-      This defines cleaning cycles, temperatures, timings, etc.
-      The config is embedded into the firmware binary at build time.
+# Note: Machine configuration is now in isochron-firmware/machine.toml
+# Copy an example from isochron-firmware/examples/ and customize it.
+# The config is embedded into the firmware binary at build time.
 
 config MACHINE_NAME
     string "Machine name"

@@ -21,11 +21,8 @@ isochron/
 ├── isochron-drivers/            # Device drivers (steppers, heaters)
 ├── isochron-protocol/           # UART protocol (controller <-> display)
 ├── isochron-firmware/           # Main controller firmware
-│
-├── configs/                      # Configuration files
-│   ├── boards/                  # Board pin mappings
-│   ├── machines/                # Machine configurations
-│   └── displays/                # Display configurations
+│   ├── machine.toml             # Machine configuration (embedded at build)
+│   └── examples/                # Example configurations
 │
 ├── profiles/                     # Build profiles
 │   ├── shipped/                 # Pre-defined profiles
@@ -143,49 +140,49 @@ make save-profile PROFILE=my-setup  # Save current as user profile
 
 ## Configuration
 
-### Board Configuration
+Like Klipper's `printer.cfg`, Isochron uses a single `machine.toml` file that contains everything:
+- Pin assignments for the board
+- Motor configurations (with Klipper-style position limits)
+- Heater settings
+- Jar definitions
+- Cleaning profiles and programs
+- Display settings
 
-Defines pin mappings for a specific board (`configs/boards/btt-pico.toml`):
+Configuration is in `isochron-firmware/machine.toml` and embedded at build time.
+
+### Example Configuration
+
+See `isochron-firmware/examples/` for complete examples:
+- `btt-pico.toml` - Full BTT SKR Pico example with all features
+- `btt-pico-minimal.toml` - Minimal configuration (basket motor + heater)
+- `custom-rp2040.toml` - Template for custom boards
+
+### Stepper Configuration (Klipper-style)
 
 ```toml
-[board]
-name = "BTT SKR Pico"
-mcu = "rp2040"
-
 [stepper.x]
-step = "gpio11"
-dir = "gpio10"
-enable = "!gpio12"  # Active low
-
-[heaters]
-heater0 = "gpio23"
-
-[thermistors]
-th0 = "gpio26"
-```
-
-### Machine Configuration
-
-Defines cleaning cycles, temperatures, timings (`configs/machines/default.toml`):
-
-```toml
-[cleaning]
-cycles = 3
-cycle_duration_sec = 180
-rinse_duration_sec = 60
-
-[heater]
-target_temp_c = 40.0
-max_temp_c = 50.0
+step_pin = "gpio11"
+dir_pin = "gpio10"
+enable_pin = "!gpio12"        # Active low
+rotation_distance = 200       # mm arc distance per motor rotation
+gear_ratio = "20:16"
+full_steps_per_rotation = 200
+microsteps = 16
+endstop_pin = "^gpio4"        # Pull-up enabled
+position_min = 0              # mm (Klipper-style)
+position_max = 800            # mm
+position_endstop = 0          # mm at endstop
+homing_speed = 30             # mm/s
 ```
 
 ## Adding New Hardware
 
 ### New RP2040 Board
 
-1. Create `configs/boards/my-board.toml` with pin mappings
-2. Create profile in `profiles/shipped/` or save with `make save-profile`
-3. Build with `make profile PROFILE=my-board && make build`
+1. Copy `isochron-firmware/examples/custom-rp2040.toml` to `machine.toml`
+2. Update GPIO pin numbers for your board
+3. Create profile with `make save-profile PROFILE=my-board`
+4. Build with `make profile PROFILE=my-board && make build`
 
 ### New Chip Family
 
@@ -196,7 +193,7 @@ max_temp_c = 50.0
 ### New Display Type
 
 1. Implement `DisplayBackend` trait for your display
-2. Add configuration in `configs/displays/`
+2. Add display configuration section to `machine.toml`
 3. Update Kconfig display options
 
 ## Motor Types
