@@ -90,10 +90,13 @@ pub fn pong_frame() -> Result<Frame, FrameError> {
     PicoMessage::Pong.to_frame()
 }
 
-#[cfg(test)]
+// Tests require std feature (not available on embedded target)
+#[cfg(all(test, feature = "std"))]
 mod tests {
+    extern crate alloc;
     use super::*;
     use crate::display::Screen;
+    use alloc::vec::Vec;
 
     #[test]
     fn test_encode_empty_screen() {

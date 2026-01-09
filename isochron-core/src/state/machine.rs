@@ -11,6 +11,8 @@ use super::events::Event;
 pub enum State {
     /// Power-on initialization, hardware checks, config loading
     Boot,
+    /// Homing Z and/or X axes (automated machines)
+    Homing,
     /// Ready state, program list visible
     Idle,
     /// Program chosen, summary displayed
@@ -25,6 +27,12 @@ pub enum State {
     AwaitingSpinOff,
     /// Basket lifted, spinning to shed excess solution
     SpinOff,
+    /// Z axis lifting basket to safe_z (automated machines)
+    Lifting,
+    /// X axis moving basket to next jar position (fully automated)
+    MovingToJar,
+    /// Z axis lowering basket into jar (automated machines)
+    Lowering,
     /// Execution paused by user
     Paused,
     /// Current step/jar complete, transitioning to next
@@ -51,6 +59,10 @@ pub enum ErrorKind {
     LinkLost,
     /// Configuration error
     ConfigError,
+    /// Homing failed (endstop not triggered, timeout)
+    HomingFailed,
+    /// Position out of bounds
+    PositionOutOfBounds,
     /// Unknown/generic error
     Unknown,
 }
@@ -58,7 +70,15 @@ pub enum ErrorKind {
 impl State {
     /// Check if this state allows motor operation
     pub fn motor_allowed(&self) -> bool {
-        matches!(self, State::Running | State::SpinOff)
+        matches!(
+            self,
+            State::Running
+                | State::SpinOff
+                | State::Homing
+                | State::Lifting
+                | State::MovingToJar
+                | State::Lowering
+        )
     }
 
     /// Check if this state allows heater operation
@@ -88,7 +108,13 @@ impl State {
         match (self, event) {
             // Boot transitions
             (Boot, BootComplete) => Idle,
+            (Boot, StartHoming) => Homing, // Automated machines home on boot
             (Boot, ErrorDetected(kind)) => Error(kind),
+
+            // Homing transitions (automated machines)
+            (Homing, HomingComplete) => Idle,
+            (Homing, Abort) => Idle,
+            (Homing, ErrorDetected(kind)) => Error(kind),
 
             // Idle transitions
             (Idle, SelectProgram) => ProgramSelected,
@@ -106,8 +132,9 @@ impl State {
             (EditProgram, Back) => ProgramSelected,
             (EditProgram, ErrorDetected(kind)) => Error(kind),
 
-            // AwaitingJar transitions (manual machines)
-            (AwaitingJar, UserConfirm) => Running,
+            // AwaitingJar transitions (manual and semi-automated machines)
+            (AwaitingJar, UserConfirm) => Running, // Manual: user moved jar, start running
+            (AwaitingJar, StartLower) => Lowering, // Semi-automated: user confirmed, lower basket
             (AwaitingJar, Abort) => Idle,
             (AwaitingJar, ErrorDetected(kind)) => Error(kind),
 
@@ -121,6 +148,7 @@ impl State {
             }
             (Running, StartSpinOff) => SpinOff,
             (Running, PromptSpinOff) => AwaitingSpinOff, // Manual machines
+            (Running, StartLift) => Lifting,             // Automated machines: lift for spinoff
             (Running, Abort) => Idle,
             (Running, ErrorDetected(kind)) => Error(kind),
 
@@ -131,6 +159,7 @@ impl State {
 
             // SpinOff transitions
             (SpinOff, SpinOffFinished) => StepComplete,
+            (SpinOff, StartLift) => Lifting, // Automated: lift after spinoff for jar transition
             (SpinOff, Abort) => Idle,
             (SpinOff, ErrorDetected(kind)) => Error(kind),
 
@@ -142,6 +171,7 @@ impl State {
             // StepComplete transitions
             (StepComplete, NextStep) => Running,
             (StepComplete, PromptNextJar) => AwaitingJar, // Manual machines
+            (StepComplete, StartLift) => Lifting,         // Automated: lift for jar transition
             (StepComplete, ProgramFinished) => ProgramComplete,
             (StepComplete, ErrorDetected(kind)) => Error(kind),
 
@@ -155,6 +185,24 @@ impl State {
             (Autotuning, AutotuneFailed) => Idle,
             (Autotuning, CancelAutotune) => Idle,
             (Autotuning, ErrorDetected(kind)) => Error(kind),
+
+            // Lifting transitions (automated machines)
+            (Lifting, LiftComplete) => StepComplete, // Scheduler decides next: StartMoveX or PromptNextJar
+            (Lifting, StartMoveX) => MovingToJar,    // Fully automated: proceed to X move
+            (Lifting, PromptNextJar) => AwaitingJar, // Semi-automated: prompt user to rotate
+            (Lifting, Abort) => Idle,
+            (Lifting, ErrorDetected(kind)) => Error(kind),
+
+            // MovingToJar transitions (fully automated machines)
+            (MovingToJar, MoveXComplete) => StepComplete, // Scheduler decides: StartLower
+            (MovingToJar, StartLower) => Lowering,
+            (MovingToJar, Abort) => Idle,
+            (MovingToJar, ErrorDetected(kind)) => Error(kind),
+
+            // Lowering transitions (automated machines)
+            (Lowering, LowerComplete) => Running, // Basket in jar, start profile
+            (Lowering, Abort) => Idle,
+            (Lowering, ErrorDetected(kind)) => Error(kind),
 
             // Error transitions
             (Error(_), AcknowledgeError) => Idle,
@@ -198,6 +246,10 @@ mod tests {
             State::Paused,
             State::SpinOff,
             State::AwaitingJar,
+            State::Homing,
+            State::Lifting,
+            State::MovingToJar,
+            State::Lowering,
         ];
 
         for state in states {
@@ -250,10 +302,19 @@ mod tests {
 
     #[test]
     fn test_motor_allowed() {
+        // Motors allowed during active states
         assert!(State::Running.motor_allowed());
         assert!(State::SpinOff.motor_allowed());
+        assert!(State::Homing.motor_allowed());
+        assert!(State::Lifting.motor_allowed());
+        assert!(State::MovingToJar.motor_allowed());
+        assert!(State::Lowering.motor_allowed());
+
+        // Motors not allowed during inactive states
         assert!(!State::Idle.motor_allowed());
         assert!(!State::Paused.motor_allowed());
+        assert!(!State::AwaitingJar.motor_allowed());
+        assert!(!State::StepComplete.motor_allowed());
     }
 
     #[test]
@@ -290,5 +351,251 @@ mod tests {
         let autotuning = State::Autotuning;
         let error = autotuning.transition(Event::ErrorDetected(ErrorKind::OverTemperature));
         assert!(matches!(error, State::Error(ErrorKind::OverTemperature)));
+    }
+
+    #[test]
+    fn test_homing_flow() {
+        // Automated machine: boot triggers homing
+        let boot = State::Boot;
+        let homing = boot.transition(Event::StartHoming);
+        assert_eq!(homing, State::Homing);
+
+        // Homing complete -> idle
+        let idle = homing.transition(Event::HomingComplete);
+        assert_eq!(idle, State::Idle);
+
+        // Homing error
+        let homing = State::Homing;
+        let error = homing.transition(Event::ErrorDetected(ErrorKind::HomingFailed));
+        assert!(matches!(error, State::Error(ErrorKind::HomingFailed)));
+    }
+
+    #[test]
+    fn test_fully_automated_flow() {
+        // Full automation: Z and X motors
+        // Running -> StepComplete -> Lifting -> MovingToJar -> Lowering -> Running
+
+        // Profile finishes
+        let running = State::Running;
+        let step_complete = running.transition(Event::ProfileFinished);
+        assert_eq!(step_complete, State::StepComplete);
+
+        // Scheduler triggers lift for jar transition
+        let lifting = step_complete.transition(Event::StartLift);
+        assert_eq!(lifting, State::Lifting);
+
+        // Lift complete, move X
+        let moving = lifting.transition(Event::StartMoveX);
+        assert_eq!(moving, State::MovingToJar);
+
+        // X move complete, lower basket
+        let lowering = moving.transition(Event::StartLower);
+        assert_eq!(lowering, State::Lowering);
+
+        // Lower complete, resume running
+        let running = lowering.transition(Event::LowerComplete);
+        assert_eq!(running, State::Running);
+    }
+
+    #[test]
+    fn test_semi_automated_flow() {
+        // Semi-automation: Z motor only, user rotates carousel
+        // Running -> StepComplete -> Lifting -> AwaitingJar -> Lowering -> Running
+
+        // Profile finishes
+        let running = State::Running;
+        let step_complete = running.transition(Event::ProfileFinished);
+        assert_eq!(step_complete, State::StepComplete);
+
+        // Scheduler triggers lift
+        let lifting = step_complete.transition(Event::StartLift);
+        assert_eq!(lifting, State::Lifting);
+
+        // Lift complete, prompt user to rotate carousel
+        let awaiting = lifting.transition(Event::PromptNextJar);
+        assert_eq!(awaiting, State::AwaitingJar);
+
+        // User confirms jar position, lower basket
+        let lowering = awaiting.transition(Event::StartLower);
+        assert_eq!(lowering, State::Lowering);
+
+        // Lower complete, resume running
+        let running = lowering.transition(Event::LowerComplete);
+        assert_eq!(running, State::Running);
+    }
+
+    #[test]
+    fn test_automated_spinoff_with_lift() {
+        // Automated machine: spinoff with lift
+        // Running -> SpinOff -> Lifting -> ...
+
+        let running = State::Running;
+        let spinoff = running.transition(Event::StartSpinOff);
+        assert_eq!(spinoff, State::SpinOff);
+
+        // After spinoff, lift for jar transition
+        let lifting = spinoff.transition(Event::StartLift);
+        assert_eq!(lifting, State::Lifting);
+    }
+
+    #[test]
+    fn test_position_error_kinds() {
+        // Test new error kinds
+        let lifting = State::Lifting;
+        let error = lifting.transition(Event::ErrorDetected(ErrorKind::PositionOutOfBounds));
+        assert!(matches!(
+            error,
+            State::Error(ErrorKind::PositionOutOfBounds)
+        ));
+
+        let moving = State::MovingToJar;
+        let error = moving.transition(Event::ErrorDetected(ErrorKind::HomingFailed));
+        assert!(matches!(error, State::Error(ErrorKind::HomingFailed)));
+    }
+
+    #[test]
+    fn test_abort_from_position_states() {
+        // Test abort from all position-related states
+        let states = [
+            State::Homing,
+            State::Lifting,
+            State::MovingToJar,
+            State::Lowering,
+        ];
+
+        for state in states {
+            let result = state.transition(Event::Abort);
+            assert_eq!(
+                result,
+                State::Idle,
+                "Abort from {:?} should go to Idle",
+                state
+            );
+        }
+    }
+
+    #[test]
+    fn test_error_from_position_states() {
+        // Test error transitions from all position states
+        let states = [
+            State::Homing,
+            State::Lifting,
+            State::MovingToJar,
+            State::Lowering,
+        ];
+
+        for state in states {
+            let result = state.transition(Event::ErrorDetected(ErrorKind::MotorStall));
+            assert!(
+                matches!(result, State::Error(ErrorKind::MotorStall)),
+                "Error from {:?} should go to Error state",
+                state
+            );
+        }
+    }
+
+    #[test]
+    fn test_lift_complete_transition() {
+        // LiftComplete from Lifting goes to StepComplete
+        let lifting = State::Lifting;
+        let result = lifting.transition(Event::LiftComplete);
+        assert_eq!(result, State::StepComplete);
+    }
+
+    #[test]
+    fn test_move_x_complete_transition() {
+        // MoveXComplete from MovingToJar goes to StepComplete
+        let moving = State::MovingToJar;
+        let result = moving.transition(Event::MoveXComplete);
+        assert_eq!(result, State::StepComplete);
+    }
+
+    #[test]
+    fn test_invalid_transitions_no_change() {
+        // Invalid transitions should not change state
+        let idle = State::Idle;
+
+        // Can't complete lift when idle
+        assert_eq!(idle.transition(Event::LiftComplete), State::Idle);
+
+        // Can't complete move when idle
+        assert_eq!(idle.transition(Event::MoveXComplete), State::Idle);
+
+        // Can't lower when idle
+        assert_eq!(idle.transition(Event::LowerComplete), State::Idle);
+
+        // Can't pause when idle
+        assert_eq!(idle.transition(Event::Pause), State::Idle);
+    }
+
+    #[test]
+    fn test_awaiting_jar_to_lowering() {
+        // Semi-automated: user confirms jar, start lowering
+        let awaiting = State::AwaitingJar;
+        let lowering = awaiting.transition(Event::StartLower);
+        assert_eq!(lowering, State::Lowering);
+    }
+
+    #[test]
+    fn test_all_error_kinds() {
+        // Ensure all error kinds can be transitioned to
+        let error_kinds = [
+            ErrorKind::ThermistorFault,
+            ErrorKind::OverTemperature,
+            ErrorKind::MotorStall,
+            ErrorKind::LinkLost,
+            ErrorKind::ConfigError,
+            ErrorKind::HomingFailed,
+            ErrorKind::PositionOutOfBounds,
+            ErrorKind::Unknown,
+        ];
+
+        for kind in error_kinds {
+            let running = State::Running;
+            let error = running.transition(Event::ErrorDetected(kind));
+            assert!(matches!(error, State::Error(k) if k == kind));
+        }
+    }
+
+    #[test]
+    fn test_lifting_to_moving_direct() {
+        // Fully automated: can go from Lifting directly to MovingToJar
+        let lifting = State::Lifting;
+        let moving = lifting.transition(Event::StartMoveX);
+        assert_eq!(moving, State::MovingToJar);
+    }
+
+    #[test]
+    fn test_lifting_to_awaiting() {
+        // Semi-automated: can go from Lifting to AwaitingJar
+        let lifting = State::Lifting;
+        let awaiting = lifting.transition(Event::PromptNextJar);
+        assert_eq!(awaiting, State::AwaitingJar);
+    }
+
+    #[test]
+    fn test_moving_to_lowering_direct() {
+        // Can go from MovingToJar directly to Lowering
+        let moving = State::MovingToJar;
+        let lowering = moving.transition(Event::StartLower);
+        assert_eq!(lowering, State::Lowering);
+    }
+
+    #[test]
+    fn test_position_states_motor_allowed() {
+        // All position states should allow motor (for stepper movement)
+        assert!(State::Homing.motor_allowed());
+        assert!(State::Lifting.motor_allowed());
+        assert!(State::MovingToJar.motor_allowed());
+        assert!(State::Lowering.motor_allowed());
+    }
+
+    #[test]
+    fn test_position_states_heater_not_allowed() {
+        // Position states should not allow heater (basket not in jar)
+        assert!(!State::Homing.heater_allowed());
+        assert!(!State::Lifting.heater_allowed());
+        assert!(!State::MovingToJar.heater_allowed());
+        assert!(!State::Lowering.heater_allowed());
     }
 }

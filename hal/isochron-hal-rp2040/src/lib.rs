@@ -17,6 +17,7 @@ pub mod flash;
 pub mod gpio;
 pub mod pins;
 pub mod pio;
+pub mod position_stepper;
 pub mod stepper;
 pub mod uart;
 

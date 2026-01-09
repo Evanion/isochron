@@ -185,7 +185,7 @@ impl Default for UiConfig {
 }
 
 /// Machine capabilities (determined from config)
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct MachineCapabilities {
@@ -211,5 +211,18 @@ impl MachineCapabilities {
             heater_count,
             is_automated: has_z && has_x,
         }
+    }
+
+    /// Check if this is a semi-automated machine (Z motor only, no X)
+    ///
+    /// Semi-automated machines can lift/lower the basket automatically,
+    /// but require the user to manually rotate the carousel between jars.
+    pub fn is_semi_automated(&self) -> bool {
+        self.has_z && !self.has_x
+    }
+
+    /// Check if this is a manual machine (no Z or X motors)
+    pub fn is_manual(&self) -> bool {
+        !self.has_z && !self.has_x
     }
 }
