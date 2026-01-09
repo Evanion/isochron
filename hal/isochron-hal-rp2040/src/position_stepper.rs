@@ -127,7 +127,14 @@ impl<'d, PIO: Instance, const SM: usize> PositionStepper<'d, PIO, SM> {
         endstop_pin: Peri<'d, END>,
         config: PositionStepperConfig,
     ) -> Self {
-        let stepper = PioStepper::new(common, sm, step_pin, dir_pin, enable_pin, config.stepper.clone());
+        let stepper = PioStepper::new(
+            common,
+            sm,
+            step_pin,
+            dir_pin,
+            enable_pin,
+            config.stepper.clone(),
+        );
 
         // Setup endstop with pull-up (most endstops are normally open, active low)
         let endstop = Input::new(endstop_pin, Pull::Up);
@@ -392,7 +399,8 @@ impl<'d, PIO: Instance, const SM: usize> PositionStepper<'d, PIO, SM> {
 
         // distance_um = (freq_hz * delta_ms * 1000) / (steps_per_mm * 1000)
         //             = (freq_hz * delta_ms) / steps_per_mm
-        let distance_um = (freq_hz as i64 * delta_ms as i64 * 1000) / (self.config.steps_per_mm as i64 * 1000);
+        let distance_um =
+            (freq_hz as i64 * delta_ms as i64 * 1000) / (self.config.steps_per_mm as i64 * 1000);
 
         if self.direction_positive {
             self.position_um += distance_um as i32;

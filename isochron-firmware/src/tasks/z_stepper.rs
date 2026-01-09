@@ -14,6 +14,7 @@ use isochron_hal_rp2040::position_stepper::{PositionError as HalPositionError, P
 use crate::channels::{HOMING_CMD, POSITION_STATUS, Z_POSITION_CMD};
 
 /// Update interval for position tracking (10ms)
+#[allow(dead_code)] // Will be used when position tracking is implemented
 const UPDATE_INTERVAL_MS: u64 = 10;
 
 /// Z-axis position stepper task
@@ -117,6 +118,7 @@ pub async fn z_stepper_task(mut stepper: PositionStepper<'static, PIO1, 0>) {
 }
 
 /// Convert HAL position error to core position error
+#[allow(dead_code)] // Will be used when position error handling is implemented
 fn hal_error_to_core(e: HalPositionError) -> PositionError {
     match e {
         HalPositionError::OutOfBounds => PositionError::OutOfBounds,

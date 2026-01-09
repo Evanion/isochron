@@ -27,5 +27,8 @@ pub use stall_monitor::{stall_monitor_task, StallMonitorConfig};
 pub use stepper::stepper_task;
 pub use tick::tick_task;
 pub use tmc::tmc_init_task;
+// Position stepper tasks - will be spawned when automated machine support is enabled
+#[allow(unused_imports)]
 pub use x_stepper::x_stepper_task;
+#[allow(unused_imports)]
 pub use z_stepper::z_stepper_task;

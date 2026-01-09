@@ -60,10 +60,7 @@ pub enum PositionStatus {
     /// Homing completed successfully
     Homed(Axis),
     /// Position operation failed
-    Error {
-        axis: Axis,
-        kind: PositionError,
-    },
+    Error { axis: Axis, kind: PositionError },
 }
 
 impl PositionStatus {
@@ -236,5 +233,113 @@ mod tests {
 
         assert_eq!(config.mm_to_steps(10), 800);
         assert_eq!(config.steps_to_mm(800), 10);
+    }
+
+    #[test]
+    fn test_position_status_homed() {
+        let homed_z = PositionStatus::homed(Axis::Z);
+        assert!(homed_z.is_success());
+        assert!(!homed_z.is_error());
+        assert_eq!(homed_z.axis(), Axis::Z);
+
+        // Homed is a specific Complete variant
+        assert!(matches!(homed_z, PositionStatus::Homed(_)));
+
+        let homed_x = PositionStatus::homed(Axis::X);
+        assert_eq!(homed_x.axis(), Axis::X);
+    }
+
+    #[test]
+    fn test_position_negative_values() {
+        // Test negative positions (e.g., below home)
+        let config = PositionConfig {
+            steps_per_mm: 100,
+            position_min_mm: -50,
+            position_max_mm: 200,
+            position_endstop_mm: 0,
+            ..Default::default()
+        };
+
+        // Negative position in bounds
+        assert!(config.is_in_bounds(-50));
+        assert!(config.is_in_bounds(-1));
+
+        // Negative position out of bounds
+        assert!(!config.is_in_bounds(-51));
+
+        // Clamp negative
+        assert_eq!(config.clamp(-100), -50);
+
+        // Steps conversion with negative
+        assert_eq!(config.mm_to_steps(-10), -1000);
+        assert_eq!(config.steps_to_mm(-1000), -10);
+    }
+
+    #[test]
+    fn test_position_error_variants() {
+        // Test all error variants are distinguishable
+        let errors = [
+            PositionError::EndstopNotTriggered,
+            PositionError::StallDetected,
+            PositionError::OutOfBounds,
+            PositionError::Timeout,
+            PositionError::NotHomed,
+        ];
+
+        for (i, e1) in errors.iter().enumerate() {
+            for (j, e2) in errors.iter().enumerate() {
+                if i == j {
+                    assert_eq!(e1, e2);
+                } else {
+                    assert_ne!(e1, e2);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_axis_equality() {
+        assert_eq!(Axis::Z, Axis::Z);
+        assert_eq!(Axis::X, Axis::X);
+        assert_ne!(Axis::Z, Axis::X);
+    }
+
+    #[test]
+    fn test_homing_command_variants() {
+        let home_z = HomingCommand::HomeZ;
+        let home_x = HomingCommand::HomeX;
+
+        assert!(matches!(home_z, HomingCommand::HomeZ));
+        assert!(matches!(home_x, HomingCommand::HomeX));
+        assert_ne!(
+            core::mem::discriminant(&home_z),
+            core::mem::discriminant(&home_x)
+        );
+    }
+
+    #[test]
+    fn test_position_config_default() {
+        let config = PositionConfig::default();
+
+        // Verify sensible defaults
+        assert!(config.steps_per_mm > 0);
+        assert!(config.position_min_mm <= config.position_max_mm);
+        assert!(config.homing_speed_mm_s > 0);
+        assert!(config.move_speed_mm_s > 0);
+        assert!(config.homing_retract_mm > 0);
+    }
+
+    #[test]
+    fn test_position_boundary_values() {
+        let config = PositionConfig {
+            position_min_mm: i32::MIN / 2, // Avoid overflow in clamp
+            position_max_mm: i32::MAX / 2,
+            ..Default::default()
+        };
+
+        // Test boundary values don't overflow
+        assert!(config.is_in_bounds(0));
+        assert!(config.is_in_bounds(i32::MAX / 2));
+        assert!(config.is_in_bounds(i32::MIN / 2));
     }
 }

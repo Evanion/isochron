@@ -97,6 +97,7 @@ pub struct Controller {
     /// Homing state (for multi-axis homing sequence)
     homing_state: HomingState,
     /// Safe Z position (mm) for automated machines
+    #[allow(dead_code)] // Used when position tasks are integrated
     safe_z: i32,
     /// Autotune UI phase
     autotune_phase: AutotunePhase,
@@ -133,6 +134,7 @@ impl Controller {
     }
 
     /// Create a new controller with capabilities and safe_z position
+    #[allow(dead_code)] // Used when position tasks are integrated
     pub fn with_safe_z(capabilities: MachineCapabilities, safe_z: i32) -> Self {
         let mut ctrl = Self::new(capabilities);
         ctrl.safe_z = safe_z;
@@ -182,6 +184,7 @@ impl Controller {
     }
 
     /// Check if homing is needed (called during boot)
+    #[allow(dead_code)] // Used when position tasks are integrated
     pub fn needs_homing(&self) -> bool {
         self.capabilities.has_z || self.capabilities.has_x
     }
@@ -236,12 +239,8 @@ impl Controller {
             PositionStatus::Complete(axis) => {
                 // Position move completed
                 match self.state {
-                    State::Lifting if axis == Axis::Z => {
-                        Some(Event::LiftComplete)
-                    }
-                    State::MovingToJar if axis == Axis::X => {
-                        Some(Event::MoveXComplete)
-                    }
+                    State::Lifting if axis == Axis::Z => Some(Event::LiftComplete),
+                    State::MovingToJar if axis == Axis::X => Some(Event::MoveXComplete),
                     State::Lowering if axis == Axis::Z => {
                         self.transition(Event::LowerComplete);
                         Some(Event::LowerComplete)
@@ -272,11 +271,13 @@ impl Controller {
     }
 
     /// Get machine capabilities
+    #[allow(dead_code)] // Used when position tasks are integrated
     pub fn capabilities(&self) -> &MachineCapabilities {
         &self.capabilities
     }
 
     /// Get safe Z position
+    #[allow(dead_code)] // Used when position tasks are integrated
     pub fn safe_z(&self) -> i32 {
         self.safe_z
     }
@@ -286,6 +287,7 @@ impl Controller {
     /// Start lift sequence (called when step completes and needs jar transition)
     ///
     /// Returns the target Z position (safe_z) if lift should start.
+    #[allow(dead_code)] // Used when position tasks are integrated
     pub fn start_lift(&mut self) -> Option<i32> {
         // Can start lift from Running, SpinOff, or StepComplete states
         let can_lift = matches!(
@@ -343,6 +345,7 @@ impl Controller {
     /// Handle user confirmation to proceed after semi-automated jar change
     ///
     /// Returns the target Z position (jar z_pos) if lowering should start.
+    #[allow(dead_code)] // Used when position tasks are integrated
     pub fn handle_jar_confirmed(&mut self) -> Option<i32> {
         if self.state != State::AwaitingJar {
             return None;
@@ -770,7 +773,8 @@ impl Controller {
     }
 }
 
-#[cfg(test)]
+// Tests require std feature (not available on embedded target)
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
     use heapless::String;
@@ -960,5 +964,384 @@ mod tests {
         // Long press to abort
         ctrl.process_input(InputEvent::EncoderLongPress);
         assert_eq!(ctrl.state(), State::Idle);
+    }
+
+    // --- Automated machine homing tests ---
+
+    #[test]
+    fn test_boot_complete_manual_machine() {
+        let mut ctrl = Controller::new(MachineCapabilities {
+            has_z: false,
+            has_x: false,
+            ..Default::default()
+        });
+
+        // Manual machine should go directly to Idle
+        let event = ctrl.boot_complete();
+        assert!(event.is_none());
+        assert_eq!(ctrl.state(), State::Idle);
+    }
+
+    #[test]
+    fn test_boot_complete_automated_machine() {
+        let mut ctrl = Controller::new(MachineCapabilities {
+            has_z: true,
+            has_x: false,
+            ..Default::default()
+        });
+
+        // Automated machine should trigger homing
+        let event = ctrl.boot_complete();
+        assert!(event.is_some());
+        assert_eq!(ctrl.state(), State::Homing);
+    }
+
+    #[test]
+    fn test_start_homing_z_first() {
+        let mut ctrl = Controller::new(MachineCapabilities {
+            has_z: true,
+            has_x: true,
+            ..Default::default()
+        });
+
+        ctrl.boot_complete();
+
+        // Should start with Z axis
+        let axis = ctrl.start_homing();
+        assert_eq!(axis, Some(Axis::Z));
+        assert_eq!(ctrl.homing_state(), HomingState::HomingZ);
+    }
+
+    #[test]
+    fn test_start_homing_x_only() {
+        let mut ctrl = Controller::new(MachineCapabilities {
+            has_z: false,
+            has_x: true,
+            ..Default::default()
+        });
+
+        ctrl.boot_complete();
+
+        // Should start with X axis (no Z)
+        let axis = ctrl.start_homing();
+        assert_eq!(axis, Some(Axis::X));
+        assert_eq!(ctrl.homing_state(), HomingState::HomingX);
+    }
+
+    #[test]
+    fn test_start_homing_no_axes() {
+        let mut ctrl = Controller::new(MachineCapabilities {
+            has_z: false,
+            has_x: false,
+            ..Default::default()
+        });
+
+        // Should return None for manual machine
+        let axis = ctrl.start_homing();
+        assert!(axis.is_none());
+        assert_eq!(ctrl.homing_state(), HomingState::Idle);
+    }
+
+    #[test]
+    fn test_handle_position_status_z_homed_then_x() {
+        use crate::controller::HomingState;
+        use isochron_core::motion::{Axis, PositionStatus};
+
+        let mut ctrl = Controller::new(MachineCapabilities {
+            has_z: true,
+            has_x: true,
+            ..Default::default()
+        });
+
+        ctrl.boot_complete();
+        ctrl.start_homing(); // HomingZ
+
+        // Z homing complete
+        let event = ctrl.handle_position_status(PositionStatus::homed(Axis::Z));
+
+        // Should transition to HomingX, no state event yet
+        assert!(event.is_none());
+        assert_eq!(ctrl.homing_state(), HomingState::HomingX);
+    }
+
+    #[test]
+    fn test_handle_position_status_x_homed_complete() {
+        use crate::controller::HomingState;
+        use isochron_core::motion::{Axis, PositionStatus};
+
+        let mut ctrl = Controller::new(MachineCapabilities {
+            has_z: true,
+            has_x: true,
+            ..Default::default()
+        });
+
+        ctrl.boot_complete();
+        ctrl.start_homing();
+
+        // Z homing complete
+        ctrl.handle_position_status(PositionStatus::homed(Axis::Z));
+
+        // X homing complete
+        let event = ctrl.handle_position_status(PositionStatus::homed(Axis::X));
+
+        // Should complete homing
+        assert!(matches!(event, Some(Event::HomingComplete)));
+        assert_eq!(ctrl.homing_state(), HomingState::Idle);
+        assert_eq!(ctrl.state(), State::Idle);
+    }
+
+    #[test]
+    fn test_handle_position_status_error() {
+        use isochron_core::motion::{Axis, PositionError, PositionStatus};
+
+        let mut ctrl = Controller::new(MachineCapabilities {
+            has_z: true,
+            ..Default::default()
+        });
+
+        ctrl.boot_complete();
+        ctrl.start_homing();
+
+        // Homing error
+        let event = ctrl.handle_position_status(PositionStatus::error(
+            Axis::Z,
+            PositionError::EndstopNotTriggered,
+        ));
+
+        assert!(matches!(
+            event,
+            Some(Event::ErrorDetected(ErrorKind::HomingFailed))
+        ));
+        assert_eq!(ctrl.state(), State::Error(ErrorKind::HomingFailed));
+    }
+
+    // --- Jar transition tests ---
+
+    #[test]
+    fn test_handle_lift_complete_fully_automated() {
+        use isochron_core::motion::Axis;
+
+        let mut ctrl = Controller::with_safe_z(
+            MachineCapabilities {
+                has_z: true,
+                has_x: true,
+                is_automated: true,
+                ..Default::default()
+            },
+            100, // safe_z
+        );
+
+        let profiles = [make_profile("Clean", 120, 60)];
+        let mut jar = make_jar("clean");
+        jar.x_pos = 50;
+        let jars = [jar];
+        let programs = [make_program("Test", &[("clean", "Clean")])];
+
+        ctrl.load_config(&programs, &profiles, &jars);
+
+        // Simulate being in Lifting state
+        ctrl.transition(Event::StartHoming);
+        ctrl.transition(Event::HomingComplete);
+        ctrl.process_input(InputEvent::EncoderClick); // Select
+        ctrl.process_input(InputEvent::EncoderClick); // Start
+        ctrl.transition(Event::StartLift);
+
+        assert_eq!(ctrl.state(), State::Lifting);
+
+        // Lift complete should trigger X move
+        let result = ctrl.handle_lift_complete();
+        assert!(result.is_some());
+        let (event, x_pos) = result.unwrap();
+        assert!(matches!(event, Event::StartMoveX));
+        assert_eq!(x_pos, 50);
+        assert_eq!(ctrl.state(), State::MovingToJar);
+    }
+
+    #[test]
+    fn test_handle_lift_complete_semi_automated() {
+        let mut ctrl = Controller::with_safe_z(
+            MachineCapabilities {
+                has_z: true,
+                has_x: false, // No X axis
+                is_automated: false,
+                ..Default::default()
+            },
+            100,
+        );
+
+        let profiles = [make_profile("Clean", 120, 60)];
+        let jars = [make_jar("clean")];
+        let programs = [make_program("Test", &[("clean", "Clean")])];
+
+        ctrl.load_config(&programs, &profiles, &jars);
+        ctrl.boot_complete();
+        ctrl.start_homing();
+        ctrl.transition(Event::HomingComplete);
+        ctrl.process_input(InputEvent::EncoderClick); // Select
+        ctrl.process_input(InputEvent::EncoderClick); // Start
+        ctrl.transition(Event::StartLift);
+
+        // Lift complete should prompt user (no X axis)
+        let result = ctrl.handle_lift_complete();
+        assert!(result.is_some());
+        let (event, _) = result.unwrap();
+        assert!(matches!(event, Event::PromptNextJar));
+        assert_eq!(ctrl.state(), State::AwaitingJar);
+    }
+
+    #[test]
+    fn test_handle_move_x_complete() {
+        let mut ctrl = Controller::with_safe_z(
+            MachineCapabilities {
+                has_z: true,
+                has_x: true,
+                is_automated: true,
+                ..Default::default()
+            },
+            100,
+        );
+
+        let profiles = [make_profile("Clean", 120, 60)];
+        let mut jar = make_jar("clean");
+        jar.z_pos = 80;
+        let jars = [jar];
+        let programs = [make_program("Test", &[("clean", "Clean")])];
+
+        ctrl.load_config(&programs, &profiles, &jars);
+        ctrl.boot_complete();
+        ctrl.start_homing();
+        ctrl.transition(Event::HomingComplete);
+        ctrl.process_input(InputEvent::EncoderClick); // Select
+        ctrl.process_input(InputEvent::EncoderClick); // Start
+        ctrl.transition(Event::StartLift);
+        ctrl.transition(Event::StartMoveX);
+
+        assert_eq!(ctrl.state(), State::MovingToJar);
+
+        // X move complete should start lowering
+        let z_pos = ctrl.handle_move_x_complete();
+        assert_eq!(z_pos, Some(80));
+        assert_eq!(ctrl.state(), State::Lowering);
+    }
+
+    #[test]
+    fn test_handle_jar_confirmed() {
+        let mut ctrl = Controller::with_safe_z(
+            MachineCapabilities {
+                has_z: true,
+                has_x: false,
+                ..Default::default()
+            },
+            100,
+        );
+
+        let profiles = [make_profile("Clean", 120, 60)];
+        let mut jar = make_jar("clean");
+        jar.z_pos = 75;
+        let jars = [jar];
+        let programs = [make_program("Test", &[("clean", "Clean")])];
+
+        ctrl.load_config(&programs, &profiles, &jars);
+        ctrl.boot_complete();
+        ctrl.start_homing();
+        ctrl.transition(Event::HomingComplete);
+        ctrl.process_input(InputEvent::EncoderClick);
+        ctrl.process_input(InputEvent::EncoderClick);
+        ctrl.transition(Event::StartLift);
+        ctrl.transition(Event::PromptNextJar);
+
+        assert_eq!(ctrl.state(), State::AwaitingJar);
+
+        // User confirms jar position
+        let z_pos = ctrl.handle_jar_confirmed();
+        assert_eq!(z_pos, Some(75));
+        assert_eq!(ctrl.state(), State::Lowering);
+    }
+
+    #[test]
+    fn test_handle_lower_complete() {
+        let mut ctrl = Controller::with_safe_z(
+            MachineCapabilities {
+                has_z: true,
+                has_x: true,
+                is_automated: true,
+                ..Default::default()
+            },
+            100,
+        );
+
+        let profiles = [make_profile("Clean", 120, 60)];
+        let jars = [make_jar("clean")];
+        let programs = [make_program("Test", &[("clean", "Clean")])];
+
+        ctrl.load_config(&programs, &profiles, &jars);
+        ctrl.boot_complete();
+        ctrl.start_homing();
+        ctrl.transition(Event::HomingComplete);
+        ctrl.process_input(InputEvent::EncoderClick);
+        ctrl.process_input(InputEvent::EncoderClick);
+        ctrl.transition(Event::StartLift);
+        ctrl.transition(Event::StartMoveX);
+        ctrl.transition(Event::StartLower);
+
+        assert_eq!(ctrl.state(), State::Lowering);
+
+        // Lower complete should resume running
+        ctrl.handle_lower_complete();
+        assert_eq!(ctrl.state(), State::Running);
+    }
+
+    #[test]
+    fn test_start_lift_from_step_complete() {
+        let mut ctrl = Controller::with_safe_z(
+            MachineCapabilities {
+                has_z: true,
+                has_x: false,
+                ..Default::default()
+            },
+            100,
+        );
+
+        let profiles = [make_profile("Clean", 120, 60)];
+        let jars = [make_jar("clean")];
+        let programs = [make_program("Test", &[("clean", "Clean")])];
+
+        ctrl.load_config(&programs, &profiles, &jars);
+        ctrl.boot_complete();
+        ctrl.start_homing();
+        ctrl.transition(Event::HomingComplete);
+        ctrl.process_input(InputEvent::EncoderClick);
+        ctrl.process_input(InputEvent::EncoderClick);
+        ctrl.transition(Event::ProfileFinished);
+
+        assert_eq!(ctrl.state(), State::StepComplete);
+
+        // Start lift should return safe_z
+        let z_pos = ctrl.start_lift();
+        assert_eq!(z_pos, Some(100));
+        assert_eq!(ctrl.state(), State::Lifting);
+    }
+
+    #[test]
+    fn test_start_lift_manual_machine() {
+        let mut ctrl = Controller::new(MachineCapabilities {
+            has_z: false, // Manual
+            ..Default::default()
+        });
+
+        let profiles = [make_profile("Clean", 120, 60)];
+        let jars = [make_jar("clean")];
+        let programs = [make_program("Test", &[("clean", "Clean")])];
+
+        ctrl.load_config(&programs, &profiles, &jars);
+        ctrl.boot_complete();
+        ctrl.process_input(InputEvent::EncoderClick);
+        ctrl.process_input(InputEvent::EncoderClick);
+        ctrl.transition(Event::ProfileFinished);
+
+        // Manual machine can't start lift
+        let z_pos = ctrl.start_lift();
+        assert!(z_pos.is_none());
+        assert_eq!(ctrl.state(), State::StepComplete); // Unchanged
     }
 }

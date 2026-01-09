@@ -17,10 +17,10 @@ use crate::channels::{
     Z_POSITION_CMD,
 };
 use crate::controller::{Controller, HomingState};
-use isochron_core::motion::HomingCommand;
 use crate::display::Renderer;
 use crate::tasks::display_tx::SCREEN_BUFFER;
 use crate::tasks::tick::TICK_SIGNAL;
+use isochron_core::motion::HomingCommand;
 
 /// Controller task - main coordination loop
 #[embassy_executor::task]
@@ -198,10 +198,8 @@ pub async fn controller_task(
                                 if let Some((next_event, x_pos)) = controller.handle_lift_complete()
                                 {
                                     debug!("Lift complete, next: {:?}", next_event);
-                                    if matches!(
-                                        next_event,
-                                        isochron_core::state::Event::StartMoveX
-                                    ) {
+                                    if matches!(next_event, isochron_core::state::Event::StartMoveX)
+                                    {
                                         info!("Starting X move to {} mm", x_pos);
                                         X_POSITION_CMD.signal(x_pos);
                                     }

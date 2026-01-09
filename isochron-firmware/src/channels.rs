@@ -7,7 +7,7 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
 use embassy_sync::signal::Signal;
 
-use isochron_core::motion::{Axis, HomingCommand, PositionStatus};
+use isochron_core::motion::{HomingCommand, PositionStatus};
 use isochron_core::scheduler::{HeaterCommand, MotorCommand};
 use isochron_core::state::Event;
 use isochron_protocol::InputEvent;

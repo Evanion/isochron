@@ -786,4 +786,131 @@ mod tests {
         assert_eq!(sched.motor_command(), MotorCommand::stopped());
         assert!(sched.step_state().is_none());
     }
+
+    #[test]
+    fn test_next_jar_differs_same_jar() {
+        // Multiple steps in the same jar should return false
+        let mut sched = Scheduler::new(MachineCapabilities {
+            is_automated: true,
+            ..Default::default()
+        });
+
+        let profiles = [
+            make_profile("Clean", 120, 10, DirectionMode::Clockwise),
+            make_profile("Rinse", 100, 10, DirectionMode::Clockwise),
+        ];
+        // Both steps use the same jar
+        let jars = [make_jar("clean")];
+        sched.load_profiles(&profiles);
+        sched.load_jars(&jars);
+
+        let program = make_program("Test", &[("clean", "Clean"), ("clean", "Rinse")]);
+        sched.start_program(program);
+
+        // On first step, next step uses same jar
+        assert!(!sched.next_jar_differs());
+    }
+
+    #[test]
+    fn test_next_jar_differs_different_jar() {
+        // Steps with different jars should return true
+        let mut sched = Scheduler::new(MachineCapabilities {
+            is_automated: true,
+            ..Default::default()
+        });
+
+        let profiles = [
+            make_profile("Clean", 120, 10, DirectionMode::Clockwise),
+            make_profile("Rinse", 100, 10, DirectionMode::Clockwise),
+        ];
+        let jars = [make_jar("clean"), make_jar("rinse")];
+        sched.load_profiles(&profiles);
+        sched.load_jars(&jars);
+
+        let program = make_program("Test", &[("clean", "Clean"), ("rinse", "Rinse")]);
+        sched.start_program(program);
+
+        // On first step, next step uses different jar
+        assert!(sched.next_jar_differs());
+    }
+
+    #[test]
+    fn test_next_jar_differs_last_step() {
+        // Last step has no next step, should return false
+        let mut sched = Scheduler::new(MachineCapabilities {
+            is_automated: true,
+            ..Default::default()
+        });
+
+        let profiles = [make_profile("Clean", 120, 10, DirectionMode::Clockwise)];
+        let jars = [make_jar("clean")];
+        sched.load_profiles(&profiles);
+        sched.load_jars(&jars);
+
+        // Single step program
+        let program = make_program("Test", &[("clean", "Clean")]);
+        sched.start_program(program);
+
+        // No next step
+        assert!(!sched.next_jar_differs());
+    }
+
+    #[test]
+    fn test_next_jar_differs_idle() {
+        // When idle (no program), should return false
+        let sched = Scheduler::new(MachineCapabilities::default());
+        assert!(!sched.next_jar_differs());
+    }
+
+    #[test]
+    fn test_multi_step_automated_flow() {
+        // Test full multi-step program on automated machine
+        let mut sched = Scheduler::new(MachineCapabilities {
+            is_automated: true,
+            has_z: true,
+            has_x: true,
+            ..Default::default()
+        });
+
+        let profiles = [
+            make_profile("Clean", 120, 5, DirectionMode::Clockwise),
+            make_profile("Rinse", 100, 5, DirectionMode::Clockwise),
+            make_profile("Dry", 80, 5, DirectionMode::Clockwise),
+        ];
+        let jars = [make_jar("clean"), make_jar("rinse"), make_jar("dry")];
+        sched.load_profiles(&profiles);
+        sched.load_jars(&jars);
+
+        let program = make_program(
+            "Full",
+            &[("clean", "Clean"), ("rinse", "Rinse"), ("dry", "Dry")],
+        );
+        sched.start_program(program);
+
+        // Step 1: running
+        assert_eq!(sched.phase(), ExecutionPhase::Running);
+        assert!(sched.next_jar_differs()); // next is different jar
+
+        // Complete step 1
+        let event = sched.tick(10);
+        assert_eq!(event, Some(Event::NextStep)); // Automated emits NextStep
+
+        // Advance to step 2
+        sched.advance_step();
+        assert_eq!(sched.phase(), ExecutionPhase::Running);
+        assert!(sched.next_jar_differs()); // still different jar ahead
+
+        // Complete step 2
+        let event = sched.tick(10);
+        assert_eq!(event, Some(Event::NextStep));
+
+        // Advance to step 3 (last)
+        sched.advance_step();
+        assert_eq!(sched.phase(), ExecutionPhase::Running);
+        assert!(!sched.next_jar_differs()); // no more steps
+
+        // Complete step 3
+        let event = sched.tick(10);
+        assert_eq!(event, Some(Event::ProgramFinished));
+    }
 }
