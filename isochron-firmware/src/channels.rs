@@ -7,6 +7,7 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 use embassy_sync::channel::Channel;
 use embassy_sync::signal::Signal;
 
+use isochron_core::motion::{Axis, HomingCommand, PositionStatus};
 use isochron_core::scheduler::{HeaterCommand, MotorCommand};
 use isochron_core::state::Event;
 use isochron_protocol::InputEvent;
@@ -112,3 +113,21 @@ pub struct CalibrationSaveRequest {
 /// Calibration save request signal (from controller to calibration task)
 pub static CALIBRATION_SAVE: Signal<CriticalSectionRawMutex, CalibrationSaveRequest> =
     Signal::new();
+
+// === Position control channels (for automated machines) ===
+
+/// Channel capacity for position status updates
+const POSITION_STATUS_SIZE: usize = 4;
+
+/// Position command for Z axis (target position in mm)
+pub static Z_POSITION_CMD: Signal<CriticalSectionRawMutex, i32> = Signal::new();
+
+/// Position command for X axis (target position in mm)
+pub static X_POSITION_CMD: Signal<CriticalSectionRawMutex, i32> = Signal::new();
+
+/// Homing command (Z or X axis)
+pub static HOMING_CMD: Signal<CriticalSectionRawMutex, HomingCommand> = Signal::new();
+
+/// Position status channel (reports completion/errors from Z and X tasks)
+pub static POSITION_STATUS: Channel<CriticalSectionRawMutex, PositionStatus, POSITION_STATUS_SIZE> =
+    Channel::new();

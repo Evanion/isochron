@@ -11,9 +11,10 @@ use isochron_core::config::{
     JarConfig, MachineCapabilities, ProfileConfig, ProgramConfig, MAX_JARS, MAX_PROFILES,
     MAX_PROGRAMS,
 };
+use isochron_core::motion::{Axis, PositionError, PositionStatus};
 use isochron_core::safety::{SafetyMonitor, SafetyStatus};
 use isochron_core::scheduler::{HeaterCommand, MotorCommand, Scheduler};
-use isochron_core::state::{Event, State};
+use isochron_core::state::{ErrorKind, Event, State};
 use isochron_protocol::InputEvent;
 
 use heapless::Vec;
@@ -61,6 +62,18 @@ impl AutotuneFailureReason {
     }
 }
 
+/// Homing state tracking
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HomingState {
+    /// Not homing
+    #[default]
+    Idle,
+    /// Homing Z axis
+    HomingZ,
+    /// Homing X axis (after Z complete)
+    HomingX,
+}
+
 /// Controller state for coordinating subsystems
 pub struct Controller {
     /// Current machine state
@@ -69,6 +82,8 @@ pub struct Controller {
     scheduler: Scheduler,
     /// Safety monitor
     safety: SafetyMonitor,
+    /// Machine capabilities
+    capabilities: MachineCapabilities,
     /// Available programs
     programs: Vec<ProgramConfig, MAX_PROGRAMS>,
     /// Available profiles (shared)
@@ -79,6 +94,10 @@ pub struct Controller {
     selected_program: u8,
     /// Last tick timestamp (ms)
     last_tick_ms: u32,
+    /// Homing state (for multi-axis homing sequence)
+    homing_state: HomingState,
+    /// Safe Z position (mm) for automated machines
+    safe_z: i32,
     /// Autotune UI phase
     autotune_phase: AutotunePhase,
     /// Autotune progress tracking
@@ -97,17 +116,27 @@ impl Controller {
             state: State::Boot,
             scheduler: Scheduler::new(capabilities),
             safety: SafetyMonitor::new(),
+            capabilities,
             programs: Vec::new(),
             profiles: Vec::new(),
             jars: Vec::new(),
             selected_program: 0,
             last_tick_ms: 0,
+            homing_state: HomingState::default(),
+            safe_z: 0,
             autotune_phase: AutotunePhase::default(),
             autotune_peaks: 0,
             autotune_elapsed_ticks: 0,
             autotune_result: None,
             autotune_failure: None,
         }
+    }
+
+    /// Create a new controller with capabilities and safe_z position
+    pub fn with_safe_z(capabilities: MachineCapabilities, safe_z: i32) -> Self {
+        let mut ctrl = Self::new(capabilities);
+        ctrl.safe_z = safe_z;
+        ctrl
     }
 
     /// Load configuration data
@@ -137,8 +166,204 @@ impl Controller {
     }
 
     /// Complete boot sequence
-    pub fn boot_complete(&mut self) {
-        self.transition(Event::BootComplete);
+    ///
+    /// For manual machines, transitions directly to Idle.
+    /// For automated machines (with Z or X motors), returns StartHoming event.
+    pub fn boot_complete(&mut self) -> Option<Event> {
+        if self.capabilities.has_z || self.capabilities.has_x {
+            // Automated machine - need to home first
+            self.transition(Event::StartHoming);
+            Some(Event::StartHoming)
+        } else {
+            // Manual machine - go directly to idle
+            self.transition(Event::BootComplete);
+            None
+        }
+    }
+
+    /// Check if homing is needed (called during boot)
+    pub fn needs_homing(&self) -> bool {
+        self.capabilities.has_z || self.capabilities.has_x
+    }
+
+    /// Start the homing sequence
+    ///
+    /// Returns the first axis to home (Z first if available, then X).
+    /// Returns None if no axes need homing.
+    pub fn start_homing(&mut self) -> Option<Axis> {
+        if self.capabilities.has_z {
+            self.homing_state = HomingState::HomingZ;
+            Some(Axis::Z)
+        } else if self.capabilities.has_x {
+            self.homing_state = HomingState::HomingX;
+            Some(Axis::X)
+        } else {
+            self.homing_state = HomingState::Idle;
+            None
+        }
+    }
+
+    /// Handle position status event from position tasks
+    ///
+    /// Returns an event if state should change.
+    pub fn handle_position_status(&mut self, status: PositionStatus) -> Option<Event> {
+        match status {
+            PositionStatus::Homed(axis) => {
+                match (axis, self.homing_state) {
+                    (Axis::Z, HomingState::HomingZ) => {
+                        // Z homing complete
+                        if self.capabilities.has_x {
+                            // Now home X
+                            self.homing_state = HomingState::HomingX;
+                            // Return None - caller will send HomeX command
+                            None
+                        } else {
+                            // All homing complete
+                            self.homing_state = HomingState::Idle;
+                            self.transition(Event::HomingComplete);
+                            Some(Event::HomingComplete)
+                        }
+                    }
+                    (Axis::X, HomingState::HomingX) => {
+                        // X homing complete - all done
+                        self.homing_state = HomingState::Idle;
+                        self.transition(Event::HomingComplete);
+                        Some(Event::HomingComplete)
+                    }
+                    _ => None,
+                }
+            }
+            PositionStatus::Complete(axis) => {
+                // Position move completed
+                match self.state {
+                    State::Lifting if axis == Axis::Z => {
+                        Some(Event::LiftComplete)
+                    }
+                    State::MovingToJar if axis == Axis::X => {
+                        Some(Event::MoveXComplete)
+                    }
+                    State::Lowering if axis == Axis::Z => {
+                        self.transition(Event::LowerComplete);
+                        Some(Event::LowerComplete)
+                    }
+                    _ => None,
+                }
+            }
+            PositionStatus::Error { axis: _, kind } => {
+                // Convert position error to state machine error
+                let error_kind = match kind {
+                    PositionError::EndstopNotTriggered | PositionError::Timeout => {
+                        ErrorKind::HomingFailed
+                    }
+                    PositionError::OutOfBounds => ErrorKind::PositionOutOfBounds,
+                    PositionError::NotHomed => ErrorKind::HomingFailed,
+                    PositionError::StallDetected => ErrorKind::MotorStall,
+                };
+                self.homing_state = HomingState::Idle;
+                self.transition(Event::ErrorDetected(error_kind));
+                Some(Event::ErrorDetected(error_kind))
+            }
+        }
+    }
+
+    /// Get current homing state
+    pub fn homing_state(&self) -> HomingState {
+        self.homing_state
+    }
+
+    /// Get machine capabilities
+    pub fn capabilities(&self) -> &MachineCapabilities {
+        &self.capabilities
+    }
+
+    /// Get safe Z position
+    pub fn safe_z(&self) -> i32 {
+        self.safe_z
+    }
+
+    // --- Jar transition methods ---
+
+    /// Start lift sequence (called when step completes and needs jar transition)
+    ///
+    /// Returns the target Z position (safe_z) if lift should start.
+    pub fn start_lift(&mut self) -> Option<i32> {
+        // Can start lift from Running, SpinOff, or StepComplete states
+        let can_lift = matches!(
+            self.state,
+            State::Running | State::SpinOff | State::StepComplete
+        );
+
+        if self.capabilities.has_z && can_lift {
+            self.transition(Event::StartLift);
+            Some(self.safe_z)
+        } else {
+            None
+        }
+    }
+
+    /// Check if lift is complete and determine next action
+    ///
+    /// Returns:
+    /// - Some((Event::StartMoveX, x_pos)) for fully automated (has_x)
+    /// - Some((Event::PromptNextJar, 0)) for semi-automated (Z only)
+    /// - None if not in Lifting state or no next jar
+    pub fn handle_lift_complete(&mut self) -> Option<(Event, i32)> {
+        if self.state != State::Lifting {
+            return None;
+        }
+
+        // Get next jar position - copy values to avoid borrow conflict
+        let x_pos = self.scheduler.current_jar()?.x_pos;
+
+        if self.capabilities.has_x {
+            // Fully automated - move X to jar position
+            self.transition(Event::StartMoveX);
+            Some((Event::StartMoveX, x_pos))
+        } else {
+            // Semi-automated - prompt user to rotate carousel
+            self.transition(Event::PromptNextJar);
+            Some((Event::PromptNextJar, 0))
+        }
+    }
+
+    /// Check if X move is complete and start lowering
+    ///
+    /// Returns the target Z position (jar z_pos) if lowering should start.
+    pub fn handle_move_x_complete(&mut self) -> Option<i32> {
+        if self.state != State::MovingToJar {
+            return None;
+        }
+
+        // Copy z_pos to avoid borrow conflict
+        let z_pos = self.scheduler.current_jar()?.z_pos;
+        self.transition(Event::StartLower);
+        Some(z_pos)
+    }
+
+    /// Handle user confirmation to proceed after semi-automated jar change
+    ///
+    /// Returns the target Z position (jar z_pos) if lowering should start.
+    pub fn handle_jar_confirmed(&mut self) -> Option<i32> {
+        if self.state != State::AwaitingJar {
+            return None;
+        }
+
+        // Copy z_pos to avoid borrow conflict
+        let z_pos = self.scheduler.current_jar()?.z_pos;
+        self.transition(Event::StartLower);
+        Some(z_pos)
+    }
+
+    /// Check if lowering is complete and resume running
+    ///
+    /// This also advances to the next step since the lift/move/lower sequence
+    /// replaced the normal advance_step flow for automated machines.
+    pub fn handle_lower_complete(&mut self) {
+        if self.state == State::Lowering {
+            // Advance to next step now that we're in the new jar
+            let _ = self.scheduler.advance_step();
+            self.transition(Event::LowerComplete);
+        }
     }
 
     /// Get current state
@@ -285,12 +510,20 @@ impl Controller {
                 Some(Event::Resume)
             }
             State::StepComplete => {
-                // Advance to next step
-                if let Some(event) = self.scheduler.advance_step() {
-                    self.transition(event);
-                    Some(event)
+                // For automated machines with Z, need to lift before moving to next jar
+                // The lift sequence will eventually call advance_step after lowering
+                if self.capabilities.has_z && self.scheduler.next_jar_differs() {
+                    // Need to change jars - start lift sequence
+                    self.transition(Event::StartLift);
+                    Some(Event::StartLift)
                 } else {
-                    None
+                    // Same jar or no Z - advance directly
+                    if let Some(event) = self.scheduler.advance_step() {
+                        self.transition(event);
+                        Some(event)
+                    } else {
+                        None
+                    }
                 }
             }
             State::ProgramComplete => {

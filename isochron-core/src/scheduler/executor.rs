@@ -461,6 +461,28 @@ impl Scheduler {
         }
     }
 
+    /// Check if the next step uses a different jar
+    ///
+    /// Returns true if there is a next step and it uses a different jar
+    /// than the current step. Used to determine if lift/move is needed.
+    pub fn next_jar_differs(&self) -> bool {
+        let program = match self.program.as_ref() {
+            Some(p) => p,
+            None => return false,
+        };
+
+        let next_index = self.step.step_index + 1;
+        if next_index as usize >= program.steps.len() {
+            // No next step
+            return false;
+        }
+
+        let current_jar = &program.steps[self.step.step_index as usize].jar;
+        let next_jar = &program.steps[next_index as usize].jar;
+
+        current_jar != next_jar
+    }
+
     /// Pause execution
     ///
     /// Motor command is preserved for resume.

@@ -186,6 +186,24 @@ async fn main(spawner: Spawner) {
         )
     });
 
+    // Detect machine capabilities before moving config
+    let has_z = config.find_stepper("z").is_some();
+    let has_x = config.find_stepper("x").is_some();
+    let has_lid = config.find_stepper("lid").is_some();
+    let heater_count = config.heater_hw.len() as u8;
+    let safe_z = config.safe_z.unwrap_or_else(|| {
+        // Default to Z motor's position_min (top of travel) if not specified
+        config
+            .find_stepper("z")
+            .map(|s| s.position_min)
+            .unwrap_or(0)
+    });
+
+    info!(
+        "Machine capabilities: has_z={}, has_x={}, has_lid={}, heaters={}, safe_z={}",
+        has_z, has_x, has_lid, heater_count, safe_z
+    );
+
     // Now we can move config
     let (programs, profiles, jars) = init_config_from_machine(config);
     info!("Configuration loaded");
@@ -436,14 +454,8 @@ async fn main(spawner: Spawner) {
         None
     };
 
-    // Machine capabilities (manual machine for now - no z/x motors)
-    let capabilities = MachineCapabilities {
-        has_z: false,
-        has_x: false,
-        has_lid: false,
-        heater_count: 1,
-        is_automated: false,
-    };
+    // Machine capabilities (detected from config)
+    let capabilities = MachineCapabilities::from_config(has_z, has_x, has_lid, heater_count);
 
     // Spawn tasks
     spawner.spawn(tasks::tick_task()).unwrap();

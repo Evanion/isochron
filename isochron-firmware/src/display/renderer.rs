@@ -442,6 +442,60 @@ impl Renderer {
         self.screen.set_line(3, reason);
         self.screen.set_line(7, "CLICK to continue");
     }
+
+    // --- Position state screens (for automated machines) ---
+
+    /// Render homing screen
+    ///
+    /// Shows which axis is being homed.
+    pub fn render_homing(&mut self, axis: &str) {
+        self.screen.clear();
+        self.screen.set_line(2, "     HOMING");
+
+        let mut axis_line: String<22> = String::new();
+        let _ = write_to_string(&mut axis_line, format_args!("  {} axis...", axis));
+        self.screen.set_line(4, &axis_line);
+
+        self.screen.set_line(6, "Please wait");
+    }
+
+    /// Render lifting screen
+    ///
+    /// Shows Z-axis lifting to safe position.
+    pub fn render_lifting(&mut self) {
+        self.screen.clear();
+        self.screen.set_line(2, "   LIFTING BASKET");
+        self.screen.set_line(4, " Moving to safe Z...");
+        self.screen.set_line(6, "Please wait");
+    }
+
+    /// Render moving to jar screen
+    ///
+    /// Shows X-axis moving to target jar position.
+    pub fn render_moving_to_jar(&mut self, jar_name: &str) {
+        self.screen.clear();
+        self.screen.set_line(2, "  MOVING TO JAR");
+
+        let mut jar_line: String<22> = String::new();
+        let _ = write_to_string(&mut jar_line, format_args!("  -> {}", jar_name));
+        self.screen.set_line(4, &jar_line);
+
+        self.screen.set_line(6, "Please wait");
+    }
+
+    /// Render lowering screen
+    ///
+    /// Shows Z-axis lowering into jar.
+    pub fn render_lowering(&mut self, jar_name: &str) {
+        self.screen.clear();
+        self.screen.set_line(2, " LOWERING BASKET");
+
+        let mut jar_line: String<22> = String::new();
+        let _ = write_to_string(&mut jar_line, format_args!("  Into: {}", jar_name));
+        self.screen.set_line(4, &jar_line);
+
+        self.screen.set_line(6, "Please wait");
+    }
 }
 
 impl Default for Renderer {
