@@ -97,7 +97,6 @@ pub struct Controller {
     /// Homing state (for multi-axis homing sequence)
     homing_state: HomingState,
     /// Safe Z position (mm) for automated machines
-    #[allow(dead_code)] // Used when position tasks are integrated
     safe_z: i32,
     /// Autotune UI phase
     autotune_phase: AutotunePhase,
@@ -134,7 +133,6 @@ impl Controller {
     }
 
     /// Create a new controller with capabilities and safe_z position
-    #[allow(dead_code)] // Used when position tasks are integrated
     pub fn with_safe_z(capabilities: MachineCapabilities, safe_z: i32) -> Self {
         let mut ctrl = Self::new(capabilities);
         ctrl.safe_z = safe_z;
@@ -184,7 +182,7 @@ impl Controller {
     }
 
     /// Check if homing is needed (called during boot)
-    #[allow(dead_code)] // Used when position tasks are integrated
+    #[allow(dead_code)] // Public API for potential future use
     pub fn needs_homing(&self) -> bool {
         self.capabilities.has_z || self.capabilities.has_x
     }
@@ -271,13 +269,13 @@ impl Controller {
     }
 
     /// Get machine capabilities
-    #[allow(dead_code)] // Used when position tasks are integrated
+    #[allow(dead_code)] // Public API for potential future use
     pub fn capabilities(&self) -> &MachineCapabilities {
         &self.capabilities
     }
 
     /// Get safe Z position
-    #[allow(dead_code)] // Used when position tasks are integrated
+    #[allow(dead_code)] // Public API for potential future use
     pub fn safe_z(&self) -> i32 {
         self.safe_z
     }
@@ -287,7 +285,6 @@ impl Controller {
     /// Start lift sequence (called when step completes and needs jar transition)
     ///
     /// Returns the target Z position (safe_z) if lift should start.
-    #[allow(dead_code)] // Used when position tasks are integrated
     pub fn start_lift(&mut self) -> Option<i32> {
         // Can start lift from Running, SpinOff, or StepComplete states
         let can_lift = matches!(
@@ -345,7 +342,6 @@ impl Controller {
     /// Handle user confirmation to proceed after semi-automated jar change
     ///
     /// Returns the target Z position (jar z_pos) if lowering should start.
-    #[allow(dead_code)] // Used when position tasks are integrated
     pub fn handle_jar_confirmed(&mut self) -> Option<i32> {
         if self.state != State::AwaitingJar {
             return None;

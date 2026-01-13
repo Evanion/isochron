@@ -16,7 +16,7 @@ use embassy_executor::Spawner;
 use embassy_rp::adc::{Adc, Channel, InterruptHandler as AdcInterruptHandler};
 use embassy_rp::bind_interrupts;
 use embassy_rp::gpio::{Input, Level, Output, Pull};
-use embassy_rp::peripherals::{DMA_CH2, FLASH, PIO0, UART0, UART1};
+use embassy_rp::peripherals::{DMA_CH2, FLASH, PIO0, PIO1, UART0, UART1};
 use embassy_rp::pio::Pio;
 use embassy_rp::pwm::{Config as PwmConfig, Pwm};
 use embassy_rp::uart::{
@@ -29,6 +29,7 @@ use {defmt_rtt as _, panic_probe as _};
 
 use isochron_hal_rp2040::flash::FlashStorage;
 use isochron_hal_rp2040::pio::StepGeneratorConfig;
+use isochron_hal_rp2040::position_stepper::{PositionStepper, PositionStepperConfig};
 use isochron_hal_rp2040::stepper::PioStepper;
 
 use crate::config::{parse_config, ConfigPersistence};
@@ -62,6 +63,7 @@ bind_interrupts!(struct Irqs {
     UART0_IRQ => BufferedInterruptHandler<UART0>;
     UART1_IRQ => UartInterruptHandler<UART1>;
     PIO0_IRQ_0 => embassy_rp::pio::InterruptHandler<PIO0>;
+    PIO1_IRQ_0 => embassy_rp::pio::InterruptHandler<PIO1>;
     ADC_IRQ_FIFO => AdcInterruptHandler;
 });
 
@@ -98,22 +100,32 @@ async fn main(spawner: Spawner) {
 
     // Extract motor config values based on motor type
     // Stepper config (only used if motor_type == Stepper)
-    let stepper_config_values = if motor_type == MotorType::Stepper {
-        config.find_stepper("basket").map(|stepper| {
-            let full_steps = stepper.full_steps_per_rotation as u32;
-            let microsteps = stepper.microsteps as u32;
-            let gear_num = stepper.gear_ratio_num as u32;
-            let gear_den = stepper.gear_ratio_den.max(1) as u32;
-            let steps = full_steps * microsteps * gear_num / gear_den;
-            info!(
-                "Stepper config: {} steps/rev ({}x{} * {}/{}), enable_inverted={}",
-                steps, full_steps, microsteps, gear_num, gear_den, stepper.enable_pin.inverted
+    let stepper_config_values =
+        if motor_type == MotorType::Stepper {
+            config.find_stepper("basket").map(|stepper| {
+                let full_steps = stepper.full_steps_per_rotation as u32;
+                let microsteps = stepper.microsteps as u32;
+                let gear_num = stepper.gear_ratio_num as u32;
+                let gear_den = stepper.gear_ratio_den.max(1) as u32;
+                let steps = full_steps * microsteps * gear_num / gear_den;
+                info!(
+                "Stepper config: {} steps/rev ({}x{} * {}/{}), pins={}/{}/{}, enable_inverted={}",
+                steps, full_steps, microsteps, gear_num, gear_den,
+                stepper.step_pin.pin, stepper.dir_pin.pin, stepper.enable_pin.pin,
+                stepper.enable_pin.inverted
             );
-            (steps, stepper.enable_pin.inverted, stepper.microsteps)
-        })
-    } else {
-        None
-    };
+                (
+                    steps,
+                    stepper.enable_pin.inverted,
+                    stepper.microsteps,
+                    stepper.step_pin.pin,
+                    stepper.dir_pin.pin,
+                    stepper.enable_pin.pin,
+                )
+            })
+        } else {
+            None
+        };
 
     // DC motor config (only used if motor_type == Dc)
     let dc_motor_config_values = if motor_type == MotorType::Dc {
@@ -204,6 +216,69 @@ async fn main(spawner: Spawner) {
         has_z, has_x, has_lid, heater_count, safe_z
     );
 
+    // Extract Z stepper config for position control (before moving config)
+    let z_stepper_config = config.find_stepper("z").map(|stepper| {
+        let full_steps = stepper.full_steps_per_rotation as u32;
+        let microsteps = stepper.microsteps as u32;
+        let gear_num = stepper.gear_ratio_num as u32;
+        let gear_den = stepper.gear_ratio_den.max(1) as u32;
+        let rotation_dist = stepper.rotation_distance as u32;
+        // steps_per_mm = (full_steps * microsteps * gear_ratio) / rotation_distance
+        let steps_per_mm = (full_steps * microsteps * gear_num) / (gear_den * rotation_dist);
+        info!(
+            "Z stepper: {} steps/mm, range {}..{} mm, endstop={:?}",
+            steps_per_mm,
+            stepper.position_min,
+            stepper.position_max.unwrap_or(200),
+            stepper.endstop_pin.map(|p| p.pin)
+        );
+        (
+            stepper.step_pin.pin,
+            stepper.dir_pin.pin,
+            stepper.enable_pin.pin,
+            stepper.enable_pin.inverted,
+            stepper.endstop_pin.map(|p| p.pin).unwrap_or(25), // Default GPIO25 for Z endstop
+            steps_per_mm,
+            stepper.position_min,
+            stepper.position_max.unwrap_or(200),
+            stepper.position_endstop.unwrap_or(0),
+            stepper.homing_speed.unwrap_or(10),
+            stepper.homing_retract_dist.unwrap_or(5),
+            stepper.homing_positive_dir.unwrap_or(false),
+        )
+    });
+
+    // Extract X stepper config for position control (before moving config)
+    let x_stepper_config = config.find_stepper("x").map(|stepper| {
+        let full_steps = stepper.full_steps_per_rotation as u32;
+        let microsteps = stepper.microsteps as u32;
+        let gear_num = stepper.gear_ratio_num as u32;
+        let gear_den = stepper.gear_ratio_den.max(1) as u32;
+        let rotation_dist = stepper.rotation_distance as u32;
+        let steps_per_mm = (full_steps * microsteps * gear_num) / (gear_den * rotation_dist);
+        info!(
+            "X stepper: {} steps/mm, range {}..{} mm, endstop={:?}",
+            steps_per_mm,
+            stepper.position_min,
+            stepper.position_max.unwrap_or(800),
+            stepper.endstop_pin.map(|p| p.pin)
+        );
+        (
+            stepper.step_pin.pin,
+            stepper.dir_pin.pin,
+            stepper.enable_pin.pin,
+            stepper.enable_pin.inverted,
+            stepper.endstop_pin.map(|p| p.pin).unwrap_or(4), // Default GPIO4 for X endstop
+            steps_per_mm,
+            stepper.position_min,
+            stepper.position_max.unwrap_or(800),
+            stepper.position_endstop.unwrap_or(0),
+            stepper.homing_speed.unwrap_or(30),
+            stepper.homing_retract_dist.unwrap_or(5),
+            stepper.homing_positive_dir.unwrap_or(false),
+        )
+    });
+
     // Now we can move config
     let (programs, profiles, jars) = init_config_from_machine(config);
     info!("Configuration loaded");
@@ -222,6 +297,12 @@ async fn main(spawner: Spawner) {
 
     // Motor hardware initialization (conditional based on motor_type)
     // Only one motor type is active at a time - use enum to hold resources
+    //
+    // Pin slot allocation (SKR Pico):
+    //   - E slot (14, 13, 15): Basket stepper motor
+    //   - X slot (11, 10, 12): X position stepper OR DC/AC motor (mutually exclusive)
+    //   - Z slot (19, 28, 2):  Z position stepper
+    //   - Y slot (6, 5, 7):    Lid stepper (future)
     enum MotorResources {
         Stepper(PioStepper<'static, PIO0, 0>),
         Dc(
@@ -237,24 +318,34 @@ async fn main(spawner: Spawner) {
         ),
     }
 
+    // For stepper motor type, X slot is available for X position stepper
+    // For DC/AC motor types, X slot is used by the main motor
     let motor_resources = match motor_type {
         MotorType::Stepper => {
-            // Setup PIO0 for stepper motor control
-            // Pin assignments are board-specific (SKR Pico: STEP=GPIO11, DIR=GPIO10, ENABLE=GPIO12)
+            // Setup PIO0 for basket stepper motor control
+            // Pin assignments from config (SKR Pico E slot: STEP=GPIO14, DIR=GPIO13, ENABLE=GPIO15)
             let Pio {
                 mut common, sm0, ..
             } = Pio::new(p.PIO0, Irqs);
 
-            let (steps_per_rev, enable_inverted, _microsteps) = stepper_config_values
-                .unwrap_or_else(|| {
-                    warn!("No stepper config found, using defaults");
-                    (3200, false, 16) // 200 steps * 16 microsteps
+            let (steps_per_rev, enable_inverted, _microsteps, step_pin, dir_pin, enable_pin) =
+                stepper_config_values.unwrap_or_else(|| {
+                    warn!("No stepper config found, using defaults (E slot: 14/13/15)");
+                    (3200, false, 16, 14, 13, 15) // 200 steps * 16 microsteps, E slot pins
                 });
 
+            // Validate expected E slot pins (SKR Pico E connector for basket motor)
+            if step_pin != 14 || dir_pin != 13 || enable_pin != 15 {
+                error!(
+                    "Basket stepper pins ({}/{}/{}) don't match SKR Pico E slot (14/13/15)",
+                    step_pin, dir_pin, enable_pin
+                );
+            }
+
             let stepper_config = StepGeneratorConfig {
-                step_pin: 11,
-                dir_pin: 10,
-                enable_pin: 12,
+                step_pin,
+                dir_pin,
+                enable_pin,
                 enable_inverted,
                 steps_per_rev,
             };
@@ -262,13 +353,196 @@ async fn main(spawner: Spawner) {
             let stepper = PioStepper::new(
                 &mut common,
                 sm0,
-                p.PIN_11, // step pin
-                p.PIN_10, // dir pin
-                p.PIN_12, // enable pin
+                p.PIN_14, // E slot step pin
+                p.PIN_13, // E slot dir pin
+                p.PIN_15, // E slot enable pin
                 stepper_config,
             );
 
-            info!("PIO stepper initialized");
+            info!(
+                "PIO stepper initialized on E slot (pins {}/{}/{})",
+                step_pin, dir_pin, enable_pin
+            );
+
+            // Initialize X position stepper if configured (uses X slot pins)
+            // This must happen here because DC/AC motor types use the same pins
+            if let Some((
+                x_step_pin,
+                x_dir_pin,
+                x_enable_pin,
+                x_enable_inverted,
+                x_endstop_pin,
+                x_steps_per_mm,
+                x_position_min,
+                x_position_max,
+                x_position_endstop,
+                x_homing_speed,
+                x_homing_retract,
+                x_home_to_max,
+            )) = x_stepper_config
+            {
+                if x_step_pin == 11 && x_dir_pin == 10 && x_enable_pin == 12 && x_endstop_pin == 4 {
+                    // Setup PIO1 for position steppers
+                    let Pio {
+                        common: mut common1,
+                        sm0: sm1_0,
+                        sm1: sm1_1,
+                        ..
+                    } = Pio::new(p.PIO1, Irqs);
+
+                    // Z stepper first (if configured)
+                    if let Some((
+                        z_step_pin,
+                        z_dir_pin,
+                        z_enable_pin,
+                        z_enable_inverted,
+                        z_endstop_pin,
+                        z_steps_per_mm,
+                        z_position_min,
+                        z_position_max,
+                        z_position_endstop,
+                        z_homing_speed,
+                        z_homing_retract,
+                        z_home_to_max,
+                    )) = z_stepper_config
+                    {
+                        if z_step_pin == 19
+                            && z_dir_pin == 28
+                            && z_enable_pin == 2
+                            && z_endstop_pin == 25
+                        {
+                            let z_hw_config = StepGeneratorConfig {
+                                step_pin: z_step_pin,
+                                dir_pin: z_dir_pin,
+                                enable_pin: z_enable_pin,
+                                enable_inverted: z_enable_inverted,
+                                steps_per_rev: z_steps_per_mm * 8,
+                            };
+                            let z_pos_config = PositionStepperConfig {
+                                stepper: z_hw_config,
+                                steps_per_mm: z_steps_per_mm,
+                                position_min_mm: z_position_min,
+                                position_max_mm: z_position_max,
+                                position_endstop_mm: z_position_endstop,
+                                homing_speed_mm_s: z_homing_speed,
+                                homing_retract_mm: z_homing_retract,
+                                move_speed_mm_s: 50,
+                                endstop_active_low: true,
+                                home_to_max: z_home_to_max,
+                            };
+                            let z_stepper = PositionStepper::new(
+                                &mut common1,
+                                sm1_0,
+                                p.PIN_19,
+                                p.PIN_28,
+                                p.PIN_2,
+                                p.PIN_25,
+                                z_pos_config,
+                            );
+                            spawner.spawn(tasks::z_stepper_task(z_stepper)).unwrap();
+                            info!("Z position stepper spawned (pins 19/28/2/25)");
+                        }
+                    }
+
+                    // X stepper
+                    let x_hw_config = StepGeneratorConfig {
+                        step_pin: x_step_pin,
+                        dir_pin: x_dir_pin,
+                        enable_pin: x_enable_pin,
+                        enable_inverted: x_enable_inverted,
+                        steps_per_rev: x_steps_per_mm * 200,
+                    };
+                    let x_pos_config = PositionStepperConfig {
+                        stepper: x_hw_config,
+                        steps_per_mm: x_steps_per_mm,
+                        position_min_mm: x_position_min,
+                        position_max_mm: x_position_max,
+                        position_endstop_mm: x_position_endstop,
+                        homing_speed_mm_s: x_homing_speed,
+                        homing_retract_mm: x_homing_retract,
+                        move_speed_mm_s: 100,
+                        endstop_active_low: true,
+                        home_to_max: x_home_to_max,
+                    };
+                    let x_stepper = PositionStepper::new(
+                        &mut common1,
+                        sm1_1,
+                        p.PIN_11,
+                        p.PIN_10,
+                        p.PIN_12,
+                        p.PIN_4,
+                        x_pos_config,
+                    );
+                    spawner.spawn(tasks::x_stepper_task(x_stepper)).unwrap();
+                    info!("X position stepper spawned (pins 11/10/12/4)");
+                } else {
+                    error!(
+                        "X stepper pins ({}/{}/{}/{}) don't match X slot (11/10/12/4)",
+                        x_step_pin, x_dir_pin, x_enable_pin, x_endstop_pin
+                    );
+                }
+            } else if has_z {
+                // Only Z stepper configured (no X)
+                let Pio {
+                    common: mut common1,
+                    sm0: sm1_0,
+                    ..
+                } = Pio::new(p.PIO1, Irqs);
+
+                if let Some((
+                    z_step_pin,
+                    z_dir_pin,
+                    z_enable_pin,
+                    z_enable_inverted,
+                    z_endstop_pin,
+                    z_steps_per_mm,
+                    z_position_min,
+                    z_position_max,
+                    z_position_endstop,
+                    z_homing_speed,
+                    z_homing_retract,
+                    z_home_to_max,
+                )) = z_stepper_config
+                {
+                    if z_step_pin == 19
+                        && z_dir_pin == 28
+                        && z_enable_pin == 2
+                        && z_endstop_pin == 25
+                    {
+                        let z_hw_config = StepGeneratorConfig {
+                            step_pin: z_step_pin,
+                            dir_pin: z_dir_pin,
+                            enable_pin: z_enable_pin,
+                            enable_inverted: z_enable_inverted,
+                            steps_per_rev: z_steps_per_mm * 8,
+                        };
+                        let z_pos_config = PositionStepperConfig {
+                            stepper: z_hw_config,
+                            steps_per_mm: z_steps_per_mm,
+                            position_min_mm: z_position_min,
+                            position_max_mm: z_position_max,
+                            position_endstop_mm: z_position_endstop,
+                            homing_speed_mm_s: z_homing_speed,
+                            homing_retract_mm: z_homing_retract,
+                            move_speed_mm_s: 50,
+                            endstop_active_low: true,
+                            home_to_max: z_home_to_max,
+                        };
+                        let z_stepper = PositionStepper::new(
+                            &mut common1,
+                            sm1_0,
+                            p.PIN_19,
+                            p.PIN_28,
+                            p.PIN_2,
+                            p.PIN_25,
+                            z_pos_config,
+                        );
+                        spawner.spawn(tasks::z_stepper_task(z_stepper)).unwrap();
+                        info!("Z position stepper spawned (pins 19/28/2/25)");
+                    }
+                }
+            }
+
             MotorResources::Stepper(stepper)
         }
         MotorType::Dc => {
@@ -415,7 +689,9 @@ async fn main(spawner: Spawner) {
         let (tmc_tx, _tmc_rx) = tmc_uart.split();
 
         // Get microsteps from stepper config for TMC
-        let stepper_microsteps = stepper_config_values.map(|(_, _, ms)| ms).unwrap_or(16);
+        let stepper_microsteps = stepper_config_values
+            .map(|(_, _, ms, _, _, _)| ms)
+            .unwrap_or(16);
 
         // TMC2209 configuration from config (already extracted above)
         let tmc_config =
@@ -506,6 +782,7 @@ async fn main(spawner: Spawner) {
     spawner
         .spawn(tasks::controller_task(
             capabilities,
+            safe_z,
             programs,
             profiles,
             jars,

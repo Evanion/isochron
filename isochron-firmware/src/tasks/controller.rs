@@ -26,14 +26,15 @@ use isochron_core::motion::HomingCommand;
 #[embassy_executor::task]
 pub async fn controller_task(
     capabilities: MachineCapabilities,
+    safe_z: i32,
     programs: &'static [ProgramConfig],
     profiles: &'static [ProfileConfig],
     jars: &'static [JarConfig],
 ) {
     info!("Controller task started");
 
-    // Initialize controller
-    let mut controller = Controller::new(capabilities);
+    // Initialize controller with safe_z position for automated machines
+    let mut controller = Controller::with_safe_z(capabilities, safe_z);
     controller.load_config(programs, profiles, jars);
 
     // Initialize renderer for building screens
@@ -85,10 +86,24 @@ pub async fn controller_task(
                     // Log event for debugging
                     let _ = EVENT_CHANNEL.try_send(event);
 
-                    // Handle autotune start/cancel
+                    // Handle events that need hardware actions
                     use crate::controller::AutotunePhase;
                     use isochron_core::state::Event;
                     match event {
+                        Event::StartLift => {
+                            // Automated machine - start lift sequence
+                            if let Some(z_pos) = controller.start_lift() {
+                                info!("Starting lift to safe_z={} mm", z_pos);
+                                Z_POSITION_CMD.signal(z_pos);
+                            }
+                        }
+                        Event::UserConfirm => {
+                            // Semi-automated: user confirmed jar position, start lowering
+                            if let Some(z_pos) = controller.handle_jar_confirmed() {
+                                info!("User confirmed jar, lowering to z={} mm", z_pos);
+                                Z_POSITION_CMD.signal(z_pos);
+                            }
+                        }
                         Event::StartAutotune => {
                             // Only send command when actually starting (Running phase)
                             if controller.autotune_phase() == AutotunePhase::Running {
@@ -139,6 +154,15 @@ pub async fn controller_task(
                 if let Some(event) = controller.tick(now_ms) {
                     debug!("Tick event: {:?}", event);
                     let _ = EVENT_CHANNEL.try_send(event);
+
+                    // Handle automated jar transitions
+                    if matches!(event, isochron_core::state::Event::StartLift) {
+                        // Automated machine - start lift sequence
+                        if let Some(z_pos) = controller.start_lift() {
+                            info!("Starting lift to safe_z={} mm", z_pos);
+                            Z_POSITION_CMD.signal(z_pos);
+                        }
+                    }
 
                     // Update motor/heater commands
                     MOTOR_CMD.signal(controller.motor_command());
