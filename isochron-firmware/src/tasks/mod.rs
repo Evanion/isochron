@@ -13,6 +13,8 @@ pub mod stall_monitor;
 pub mod stepper;
 pub mod tick;
 pub mod tmc;
+pub mod x_stepper;
+pub mod z_stepper;
 
 pub use ac_motor::{ac_motor_task, AcMotorFwConfig};
 pub use calibration::calibration_task;
@@ -25,3 +27,5 @@ pub use stall_monitor::{stall_monitor_task, StallMonitorConfig};
 pub use stepper::stepper_task;
 pub use tick::tick_task;
 pub use tmc::tmc_init_task;
+pub use x_stepper::x_stepper_task;
+pub use z_stepper::z_stepper_task;

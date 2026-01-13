@@ -442,6 +442,60 @@ impl Renderer {
         self.screen.set_line(3, reason);
         self.screen.set_line(7, "CLICK to continue");
     }
+
+    // --- Position state screens (for automated machines) ---
+
+    /// Render homing screen
+    ///
+    /// Shows which axis is being homed.
+    pub fn render_homing(&mut self, axis: &str) {
+        self.screen.clear();
+        self.screen.set_line(2, "     HOMING");
+
+        let mut axis_line: String<22> = String::new();
+        let _ = write_to_string(&mut axis_line, format_args!("  {} axis...", axis));
+        self.screen.set_line(4, &axis_line);
+
+        self.screen.set_line(6, "Please wait");
+    }
+
+    /// Render lifting screen
+    ///
+    /// Shows Z-axis lifting to safe position.
+    pub fn render_lifting(&mut self) {
+        self.screen.clear();
+        self.screen.set_line(2, "   LIFTING BASKET");
+        self.screen.set_line(4, " Moving to safe Z...");
+        self.screen.set_line(6, "Please wait");
+    }
+
+    /// Render moving to jar screen
+    ///
+    /// Shows X-axis moving to target jar position.
+    pub fn render_moving_to_jar(&mut self, jar_name: &str) {
+        self.screen.clear();
+        self.screen.set_line(2, "  MOVING TO JAR");
+
+        let mut jar_line: String<22> = String::new();
+        let _ = write_to_string(&mut jar_line, format_args!("  -> {}", jar_name));
+        self.screen.set_line(4, &jar_line);
+
+        self.screen.set_line(6, "Please wait");
+    }
+
+    /// Render lowering screen
+    ///
+    /// Shows Z-axis lowering into jar.
+    pub fn render_lowering(&mut self, jar_name: &str) {
+        self.screen.clear();
+        self.screen.set_line(2, " LOWERING BASKET");
+
+        let mut jar_line: String<22> = String::new();
+        let _ = write_to_string(&mut jar_line, format_args!("  Into: {}", jar_name));
+        self.screen.set_line(4, &jar_line);
+
+        self.screen.set_line(6, "Please wait");
+    }
 }
 
 impl Default for Renderer {
@@ -456,7 +510,8 @@ fn write_to_string(s: &mut String<22>, args: core::fmt::Arguments<'_>) -> core::
     s.write_fmt(args)
 }
 
-#[cfg(test)]
+// Tests require std feature (not available on embedded target)
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
 
@@ -522,5 +577,144 @@ mod tests {
 
         assert!(renderer.screen().get_line(0).contains("ERROR"));
         assert!(renderer.screen().get_line(2).contains("OVER TEMP"));
+    }
+
+    #[test]
+    fn test_render_homing() {
+        let mut renderer = Renderer::new();
+        renderer.render_homing("Z");
+
+        assert!(renderer.screen().get_line(2).contains("HOMING"));
+        assert!(renderer.screen().get_line(4).contains("Z axis"));
+    }
+
+    #[test]
+    fn test_render_homing_x_axis() {
+        let mut renderer = Renderer::new();
+        renderer.render_homing("X");
+
+        assert!(renderer.screen().get_line(4).contains("X axis"));
+    }
+
+    #[test]
+    fn test_render_lifting() {
+        let mut renderer = Renderer::new();
+        renderer.render_lifting();
+
+        assert!(renderer.screen().get_line(2).contains("LIFTING"));
+        assert!(renderer.screen().get_line(4).contains("safe Z"));
+    }
+
+    #[test]
+    fn test_render_moving_to_jar() {
+        let mut renderer = Renderer::new();
+        renderer.render_moving_to_jar("rinse");
+
+        assert!(renderer.screen().get_line(2).contains("MOVING"));
+        assert!(renderer.screen().get_line(4).contains("rinse"));
+    }
+
+    #[test]
+    fn test_render_lowering() {
+        let mut renderer = Renderer::new();
+        renderer.render_lowering("clean");
+
+        assert!(renderer.screen().get_line(2).contains("LOWERING"));
+        assert!(renderer.screen().get_line(4).contains("clean"));
+    }
+
+    #[test]
+    fn test_render_awaiting_jar() {
+        let mut renderer = Renderer::new();
+        renderer.render_awaiting_jar("rinse", "Move basket to:");
+
+        assert!(renderer.screen().get_line(2).contains("Move basket"));
+        assert!(renderer.screen().get_line(4).contains("rinse"));
+    }
+
+    #[test]
+    fn test_render_paused() {
+        let mut renderer = Renderer::new();
+        renderer.render_paused("Full Clean", 2, 4);
+
+        assert!(renderer.screen().get_line(2).contains("PAUSED"));
+        assert!(renderer.screen().get_line(4).contains("Full Clean"));
+        assert!(renderer.screen().get_line(4).contains("2/4"));
+    }
+
+    #[test]
+    fn test_render_step_complete() {
+        let mut renderer = Renderer::new();
+        renderer.render_step_complete("rinse");
+
+        assert!(renderer.screen().get_line(2).contains("Step Complete"));
+        assert!(renderer.screen().get_line(5).contains("rinse"));
+    }
+
+    #[test]
+    fn test_render_complete() {
+        let mut renderer = Renderer::new();
+        renderer.render_complete("Full Clean", 125);
+
+        assert!(renderer.screen().get_line(1).contains("COMPLETE"));
+        assert!(renderer.screen().get_line(3).contains("Full Clean"));
+        assert!(renderer.screen().get_line(5).contains("2:05")); // 125s = 2:05
+    }
+
+    #[test]
+    fn test_render_autotune_confirm() {
+        let mut renderer = Renderer::new();
+        renderer.render_autotune_confirm(45);
+
+        assert!(renderer.screen().get_line(0).contains("AUTOTUNE"));
+        assert!(renderer.screen().get_line(5).contains("45"));
+    }
+
+    #[test]
+    fn test_render_autotune_progress() {
+        let mut renderer = Renderer::new();
+        renderer.render_autotune_progress(6, 120, 42, 45);
+
+        assert!(renderer.screen().get_line(0).contains("AUTOTUNING"));
+        assert!(renderer.screen().get_line(2).contains("42")); // current temp
+        assert!(renderer.screen().get_line(4).contains("3/12")); // 6 peaks / 2 = 3 oscillations
+    }
+
+    #[test]
+    fn test_render_autotune_complete() {
+        let mut renderer = Renderer::new();
+        renderer.render_autotune_complete(250, 50, 100);
+
+        assert!(renderer.screen().get_line(0).contains("COMPLETE"));
+        assert!(renderer.screen().get_line(2).contains("2.50")); // Kp
+        assert!(renderer.screen().get_line(3).contains("0.50")); // Ki
+        assert!(renderer.screen().get_line(4).contains("1.00")); // Kd
+    }
+
+    #[test]
+    fn test_render_autotune_failed() {
+        let mut renderer = Renderer::new();
+        renderer.render_autotune_failed("Timeout occurred");
+
+        assert!(renderer.screen().get_line(0).contains("FAILED"));
+        assert!(renderer.screen().get_line(3).contains("Timeout"));
+    }
+
+    #[test]
+    fn test_screen_line_truncation() {
+        let mut screen = Screen::new();
+        let long_text = "This is a very long line that exceeds the 21 character limit";
+        screen.set_line(0, long_text);
+
+        // Line should be truncated to DISPLAY_COLS (21 chars)
+        assert!(screen.get_line(0).len() <= 21);
+    }
+
+    #[test]
+    fn test_screen_out_of_bounds() {
+        let screen = Screen::new();
+
+        // Out of bounds row should return empty string
+        assert_eq!(screen.get_line(10), "");
     }
 }

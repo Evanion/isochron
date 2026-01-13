@@ -12,26 +12,29 @@ use isochron_core::state::State;
 
 use crate::channels::{
     AutotuneCommand, AutotuneStatus, CalibrationSaveRequest, AUTOTUNE_CMD, AUTOTUNE_STATUS,
-    CALIBRATION_SAVE, EVENT_CHANNEL, HEARTBEAT_RECEIVED, HEATER_CMD, INPUT_CHANNEL, MOTOR_CMD,
-    MOTOR_STALL, SCREEN_UPDATE, TEMP_READING,
+    CALIBRATION_SAVE, EVENT_CHANNEL, HEARTBEAT_RECEIVED, HEATER_CMD, HOMING_CMD, INPUT_CHANNEL,
+    MOTOR_CMD, MOTOR_STALL, POSITION_STATUS, SCREEN_UPDATE, TEMP_READING, X_POSITION_CMD,
+    Z_POSITION_CMD,
 };
-use crate::controller::Controller;
+use crate::controller::{Controller, HomingState};
 use crate::display::Renderer;
 use crate::tasks::display_tx::SCREEN_BUFFER;
 use crate::tasks::tick::TICK_SIGNAL;
+use isochron_core::motion::HomingCommand;
 
 /// Controller task - main coordination loop
 #[embassy_executor::task]
 pub async fn controller_task(
     capabilities: MachineCapabilities,
+    safe_z: i32,
     programs: &'static [ProgramConfig],
     profiles: &'static [ProfileConfig],
     jars: &'static [JarConfig],
 ) {
     info!("Controller task started");
 
-    // Initialize controller
-    let mut controller = Controller::new(capabilities);
+    // Initialize controller with safe_z position for automated machines
+    let mut controller = Controller::with_safe_z(capabilities, safe_z);
     controller.load_config(programs, profiles, jars);
 
     // Initialize renderer for building screens
@@ -41,9 +44,24 @@ pub async fn controller_task(
     renderer.render_boot();
     update_screen_buffer(&renderer).await;
 
-    // Complete boot sequence
-    controller.boot_complete();
-    info!("Boot complete, entering idle state");
+    // Complete boot sequence - may trigger homing for automated machines
+    if let Some(_event) = controller.boot_complete() {
+        // Automated machine - start homing sequence
+        if let Some(axis) = controller.start_homing() {
+            info!("Starting homing sequence with {:?} axis", axis);
+            match axis {
+                isochron_core::motion::Axis::Z => {
+                    HOMING_CMD.signal(HomingCommand::HomeZ);
+                }
+                isochron_core::motion::Axis::X => {
+                    HOMING_CMD.signal(HomingCommand::HomeX);
+                }
+            }
+        }
+        info!("Boot complete, homing in progress");
+    } else {
+        info!("Boot complete, entering idle state");
+    }
 
     // Render initial menu
     render_current_state(&controller, &mut renderer).await;
@@ -68,10 +86,24 @@ pub async fn controller_task(
                     // Log event for debugging
                     let _ = EVENT_CHANNEL.try_send(event);
 
-                    // Handle autotune start/cancel
+                    // Handle events that need hardware actions
                     use crate::controller::AutotunePhase;
                     use isochron_core::state::Event;
                     match event {
+                        Event::StartLift => {
+                            // Automated machine - start lift sequence
+                            if let Some(z_pos) = controller.start_lift() {
+                                info!("Starting lift to safe_z={} mm", z_pos);
+                                Z_POSITION_CMD.signal(z_pos);
+                            }
+                        }
+                        Event::UserConfirm => {
+                            // Semi-automated: user confirmed jar position, start lowering
+                            if let Some(z_pos) = controller.handle_jar_confirmed() {
+                                info!("User confirmed jar, lowering to z={} mm", z_pos);
+                                Z_POSITION_CMD.signal(z_pos);
+                            }
+                        }
                         Event::StartAutotune => {
                             // Only send command when actually starting (Running phase)
                             if controller.autotune_phase() == AutotunePhase::Running {
@@ -123,6 +155,15 @@ pub async fn controller_task(
                     debug!("Tick event: {:?}", event);
                     let _ = EVENT_CHANNEL.try_send(event);
 
+                    // Handle automated jar transitions
+                    if matches!(event, isochron_core::state::Event::StartLift) {
+                        // Automated machine - start lift sequence
+                        if let Some(z_pos) = controller.start_lift() {
+                            info!("Starting lift to safe_z={} mm", z_pos);
+                            Z_POSITION_CMD.signal(z_pos);
+                        }
+                    }
+
                     // Update motor/heater commands
                     MOTOR_CMD.signal(controller.motor_command());
                     HEATER_CMD.signal(controller.heater_command());
@@ -153,6 +194,64 @@ pub async fn controller_task(
                 if HEARTBEAT_RECEIVED.signaled() {
                     HEARTBEAT_RECEIVED.reset();
                     controller.heartbeat_received();
+                }
+
+                // Check for position status updates from stepper tasks
+                while let Ok(status) = POSITION_STATUS.try_receive() {
+                    debug!("Position status: {:?}", status);
+
+                    // Get current state before handling
+                    let was_lifting = controller.state() == State::Lifting;
+                    let was_moving_to_jar = controller.state() == State::MovingToJar;
+                    let was_lowering = controller.state() == State::Lowering;
+
+                    if let Some(event) = controller.handle_position_status(status) {
+                        debug!("Position event: {:?}", event);
+                        let _ = EVENT_CHANNEL.try_send(event);
+
+                        // Check if we need to continue homing sequence (Z done, X next)
+                        if controller.homing_state() == HomingState::HomingX {
+                            info!("Z homing complete, starting X homing");
+                            HOMING_CMD.signal(HomingCommand::HomeX);
+                        }
+
+                        // Handle jar transition sequence
+                        match event {
+                            isochron_core::state::Event::LiftComplete if was_lifting => {
+                                // Lift done - move X or prompt user
+                                if let Some((next_event, x_pos)) = controller.handle_lift_complete()
+                                {
+                                    debug!("Lift complete, next: {:?}", next_event);
+                                    if matches!(next_event, isochron_core::state::Event::StartMoveX)
+                                    {
+                                        info!("Starting X move to {} mm", x_pos);
+                                        X_POSITION_CMD.signal(x_pos);
+                                    }
+                                    // PromptNextJar is handled by display - user will click
+                                }
+                            }
+                            isochron_core::state::Event::MoveXComplete if was_moving_to_jar => {
+                                // X move done - start lowering
+                                if let Some(z_pos) = controller.handle_move_x_complete() {
+                                    info!("X move complete, lowering to {} mm", z_pos);
+                                    Z_POSITION_CMD.signal(z_pos);
+                                }
+                            }
+                            isochron_core::state::Event::LowerComplete if was_lowering => {
+                                // Lower done - resume running
+                                controller.handle_lower_complete();
+                                info!("Lower complete, resuming");
+                            }
+                            _ => {}
+                        }
+
+                        // Update motor/heater commands
+                        MOTOR_CMD.signal(controller.motor_command());
+                        HEATER_CMD.signal(controller.heater_command());
+
+                        // Re-render display
+                        render_current_state(&controller, &mut renderer).await;
+                    }
                 }
 
                 // Check for autotune status updates
@@ -316,9 +415,33 @@ async fn render_current_state(controller: &Controller, renderer: &mut Renderer) 
                 isochron_core::state::ErrorKind::MotorStall => "MOTOR STALL",
                 isochron_core::state::ErrorKind::LinkLost => "LINK LOST",
                 isochron_core::state::ErrorKind::ConfigError => "CONFIG ERROR",
+                isochron_core::state::ErrorKind::HomingFailed => "HOMING FAILED",
+                isochron_core::state::ErrorKind::PositionOutOfBounds => "POS OUT OF BOUNDS",
                 isochron_core::state::ErrorKind::Unknown => "UNKNOWN ERROR",
             };
             renderer.render_error(error_type, "Power cycle to restart");
+        }
+        State::Homing => {
+            // Show which axis is being homed
+            let axis = match controller.homing_state() {
+                HomingState::HomingZ => "Z",
+                HomingState::HomingX => "X",
+                HomingState::Idle => "?", // Shouldn't happen in Homing state
+            };
+            renderer.render_homing(axis);
+        }
+        State::Lifting => {
+            renderer.render_lifting();
+        }
+        State::MovingToJar => {
+            if let Some(jar) = controller.current_jar() {
+                renderer.render_moving_to_jar(jar.name.as_str());
+            }
+        }
+        State::Lowering => {
+            if let Some(jar) = controller.current_jar() {
+                renderer.render_lowering(jar.name.as_str());
+            }
         }
         State::EditProgram => {
             // Placeholder for edit mode

@@ -52,6 +52,24 @@ pub enum Event {
     /// Prompt user to move to next jar
     PromptNextJar,
 
+    // Position control events (automated machines)
+    /// Start homing sequence (Z first, then X)
+    StartHoming,
+    /// Homing completed successfully
+    HomingComplete,
+    /// Begin lifting basket to safe_z
+    StartLift,
+    /// Basket reached safe_z position
+    LiftComplete,
+    /// Begin X axis move to jar position
+    StartMoveX,
+    /// X axis reached target jar position
+    MoveXComplete,
+    /// Begin lowering basket into jar
+    StartLower,
+    /// Basket reached jar z_pos
+    LowerComplete,
+
     // PID autotune events
     /// User started PID autotune
     StartAutotune,
@@ -100,6 +118,14 @@ impl Event {
                 | Event::PromptSpinOff
                 | Event::SpinOffFinished
                 | Event::PromptNextJar
+                | Event::StartHoming
+                | Event::HomingComplete
+                | Event::StartLift
+                | Event::LiftComplete
+                | Event::StartMoveX
+                | Event::MoveXComplete
+                | Event::StartLower
+                | Event::LowerComplete
         )
     }
 

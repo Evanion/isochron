@@ -16,6 +16,8 @@ defmt = [
     "isochron-hal-rp2040/defmt",
     "isochron-protocol/defmt",
 ]
+# Enable std for host-side testing (not for embedded target)
+std = []
 
 [dependencies]
 # Workspace crates

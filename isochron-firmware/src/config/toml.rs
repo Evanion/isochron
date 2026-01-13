@@ -797,7 +797,8 @@ fn save_section(
     Ok(())
 }
 
-#[cfg(test)]
+// Tests require std feature (not available on embedded target)
+#[cfg(all(test, feature = "std"))]
 mod tests {
     use super::*;
 
